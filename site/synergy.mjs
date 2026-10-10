@@ -58,11 +58,13 @@ export function deckPlan(keywords=[], commander={}) {
 export function synergyFeatures(card, plan, creatureTypes=[], commander={}) {
   const t=lc(card.oracle_text); const typ=lc(card.type_line);const command=lc(commander.oracle_text);
   const shape=PLANS[normalizeTheme(plan)];
+  const tribalPayoff=creatureTypes.some(type=>t.includes(lc(type)) && (/you control|whenever|creature spells?|gets? \+|other creatures/i.test(t)));
+  const tribalPlan=!shape && creatureTypes.length>0;
   const tribe=creatureTypes.some(type=>{
     const w=lc(type);return typ.includes(w) && /\bcreature\b/.test(typ) || t.includes(w);
   });
   const enabler=Boolean(shape?.enabler.some(re=>re.test(t)));
-  const payoff=Boolean(shape?.payoff.some(re=>re.test(t)));
+  const payoff=Boolean(shape?.payoff.some(re=>re.test(t)) || (tribalPlan && tribalPayoff));
   const leaderSupport=Boolean(command && (
     (tribe && creatureTypes.length) ||
     (/\bcreature\b/.test(command) && /\bcreature\b/.test(typ) && /whenever .*creature/.test(command)) ||
@@ -79,10 +81,11 @@ export function cohesionReport(spells, plan, creatureTypes=[], commander={}) {
   const payoffs=facts.filter(f=>f.payoff).length;
   const bridges=facts.filter(f=>f.coherent).length;
   const warnings=[];
-  if(plan && enablers<9) warnings.push('Engine lacks enough enablers ('+enablers+'); the plan may not start consistently.');
-  if(plan && payoffs<5) warnings.push('Engine has only '+payoffs+' clear payoffs; it may generate value without a win condition.');
-  if(plan && bridges<Math.ceil(spells.length*.35)) warnings.push('Only '+bridges+' of '+spells.length+' nonland cards clearly connect to the game plan.');
-  const score=plan?Math.round(Math.min(100,35* Math.min(enablers/14,1)+35*Math.min(payoffs/9,1)+30*Math.min(bridges/(spells.length*.52),1))):0;
-  return {plan:PLANS[plan]?.label || (creatureTypes[0] ? creatureTypes.join('/')+' tribal' : 'General value'),
+  const intentional=Boolean(plan || creatureTypes.length);
+  if(intentional && enablers<9) warnings.push('Engine lacks enough enablers ('+enablers+'); the plan may not start consistently.');
+  if(intentional && payoffs<5) warnings.push('Engine has only '+payoffs+' clear payoffs; it may generate value without a win condition.');
+  if(intentional && bridges<Math.ceil(spells.length*.35)) warnings.push('Only '+bridges+' of '+spells.length+' nonland cards clearly connect to the game plan.');
+  const score=intentional?Math.round(Math.min(100,35* Math.min(enablers/14,1)+35*Math.min(payoffs/9,1)+30*Math.min(bridges/(spells.length*.52),1))):0;
+  return {planKey:plan || (creatureTypes.length?'tribal':null),plan:PLANS[plan]?.label || (creatureTypes[0] ? creatureTypes.join('/')+' tribal' : 'General value'),
     enablers,payoffs,connected:bridges, score, warnings};
 }
