@@ -11,13 +11,13 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">✦</span><span>xper<span class="mint">_mDm</span></span></div>
-    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.2 · BROWSER EDITION</span></div>
+    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.3 · BROWSER EDITION</span></div>
   </header>
   <main class="layout">
     <section class="intro">
       <div class="eyebrow">BUILD WITH INTENTION</div>
       <h1>Find your next <em>Commander</em> deck.</h1>
-      <p>Choose a color identity, favorite creature types, mechanics, a commander, or up to five must-have cards. Generate up to four legality-checked 100-card decks right here in your browser—no login or installation.</p>
+      <p>Choose a color identity, favorite creature types, mechanics, a commander, or up to five must-have cards. Describe your ideal playstyle, choose cards and colors, and generate up to four legality-checked 100-card decks right in your browser. Preview real card art and shape the mana curve.</p>
     </section>
     <div class="workbench">
       <form id="builder" class="settings">
@@ -49,6 +49,17 @@
           <label for="favorites">Must-have cards <small>Up to 5 · one card name per line</small></label>
           <textarea id="favorites" rows="4" placeholder="Doubling Season&#10;Parallel Lives&#10;Beast Within"></textarea>
           <p class="hint">All listed cards must be Commander-legal and within your commander's color identity. Commas inside card names are fine.</p>
+        </div>
+        <div class="fieldgroup">
+          <label for="deck-prompt">Describe your ideal deck <small>Optional · plain English</small></label>
+          <textarea id="deck-prompt" rows="4" maxlength="800" placeholder="I want a Frog tribal deck that blinks creatures, makes tokens, and has lots of enter-the-battlefield triggers."></textarea>
+          <p class="hint">The forge looks for supported creature types and mechanics in your description. It is keyword interpretation—not a generative AI chatbot—and your existing selections take priority.</p>
+          <p id="prompt-preview" class="prompt-preview" aria-live="polite"></p>
+        </div>
+        <div class="fieldgroup curve-settings">
+          <label for="use-curve" class="curve-toggle"><input type="checkbox" id="use-curve"> Target average mana value</label>
+          <div class="curve-row"><input type="range" id="target-cmc" min="1.5" max="5.5" value="3.0" step="0.1" disabled aria-label="Target average mana value excluding commander and lands"><output id="curve-value" for="target-cmc">3.0</output></div>
+          <p class="hint">Optional. Adjusts the 62 nonland cards; excludes the commander and all lands. Required favorites remain locked. If a target can't be reached, the result shows its actual average and a warning.</p>
         </div>
         <div class="fieldgroup">
           <label for="options">Number of deck ideas</label>

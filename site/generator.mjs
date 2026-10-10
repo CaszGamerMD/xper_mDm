@@ -3,6 +3,8 @@
  * Heuristic construction is deliberately distinct from rules validation.
  */
 import { BASICS, ROLE_SEEDS, ROLE_QUERIES, THEMES } from './seeds.mjs';
+import { interpretPrompt } from './intent.mjs';
+import { averageSpellManaValue } from './presentation.mjs';
 
 export const COLORS = 'WUBRG';
 export const ROLE_ORDER = ['ramp', 'draw', 'removal', 'protection', 'wipe', 'finisher', 'synergy'];
@@ -334,6 +336,42 @@ export class BrowserGenerator {
     for (const role of ['ramp','draw','removal','wipe','protection','finisher']) if(roleMatch(card,role)) return role;
     return 'synergy';
   }
+  /** Keep roles, favorite cards and singleton rules while steering the 62 spells toward a target curve. */
+  rebalanceCurve(spells, spellPool, pinnedNames, target, req, terms, variant) {
+    if (target === null) return spells;
+    const goal=spells.length*target;
+    let sum=spells.reduce((n,[card])=>n+card.cmc,0);
+    const taken=new Set(spells.map(([card])=>normalized(card)));
+    // Preserve each role and always prefer the closest feasible curve, not an invented claim of exactness.
+    for(let pass=0;pass<70 && Math.abs(sum-goal)>0.05;pass++) {
+      let best=null;
+      let bestGain=0;
+      for(let i=0;i<spells.length;i++) {
+        const [previous,role]=spells[i];
+        if(pinnedNames.has(normalized(previous))) continue;
+        const oldTheme=themeScore(previous,req.creature_types,terms);
+        const before=Math.abs(sum-goal);
+        for(const option of spellPool) {
+          if (taken.has(normalized(option)) || option.land || !roleMatch(option,role)) continue;
+          const nextSum=sum-previous.cmc+option.cmc;
+          const improved=before-Math.abs(nextSum-goal);
+          if(improved<=0) continue;
+          const newTheme=themeScore(option,req.creature_types,terms);
+          if(role==='synergy' && oldTheme>=5 && newTheme===0) continue;
+          const thematicLoss=Math.max(0,oldTheme-newTheme)*.035;
+          const qualityLoss=Math.max(0,cardScore(previous,role,oldTheme,variant)-cardScore(option,role,newTheme,variant))*.013;
+          const gain=improved-thematicLoss-qualityLoss;
+          if(gain>bestGain+0.00001){ bestGain=gain;best={i,option,nextSum,previous,role}; }
+        }
+      }
+      if(!best) break;
+      taken.delete(normalized(best.previous));
+      taken.add(normalized(best.option));
+      spells[best.i]=[best.option,best.role];
+      sum=best.nextSum;
+    }
+    return spells;
+  }
   async build(req,commander,favorites,profile,variant,pool) {
     const [title,description,targets]=profile;
     const [spellPool,landPool,terms]=pool;
@@ -379,6 +417,7 @@ export class BrowserGenerator {
       const extra=spells.filter(([c])=>!pinnedNames.has(normalized(c)));
       spells=[...pinned,...extra.slice(0,62-pinned.length)];
     }
+    spells=this.rebalanceCurve(spells,spellPool.filter(c=>withinIdentity(c,commander)),pinnedNames,req.target_cmc,req,terms,variant);
     const targetLands=({0:17,1:11,2:19,3:24,4:26,5:28}[commander.color_identity.length] || 17) + (variant===3?1:0);
     const needNonbasic=Math.max(0,targetLands-pinnedLands.length);
     const nonbasics=this.pickNonbasics(landPool,commander,variant,needNonbasic,taken);
@@ -407,31 +446,42 @@ export class BrowserGenerator {
     if(unfilled.length) warnings.push('Some ideal role slots lacked clear matches: '+unfilled.map(r=>ROLE_LABELS[r]).join(', ')+'.');
     if(nonbasics.length<needNonbasic) warnings.push('Limited nonbasic land choices; the mana base relies more heavily on basics.');
     if(!intent) warnings.push('No clear theme was given or inferred; this is a broad shell rather than a tuned strategy.');
-    const avgCmc=spells.reduce((sum,[c])=>sum+c.cmc,0)/62;
+    const avgCmc=averageSpellManaValue(spells.map(([card])=>card));
+    if(req.target_cmc!==null && Math.abs(avgCmc-req.target_cmc)>0.2)
+      warnings.push(`Target mana value ${req.target_cmc.toFixed(1)} could not be closely met; achieved ${avgCmc.toFixed(2)} with legal cards and required favorites.`);
     if(avgCmc>4.2) warnings.push('High mana curve may make early turns inconsistent.');
     let score=88;
     score-=intent?Math.round(Math.max(0,.45-fraction)*60):18;
     score-=Math.min(25,unfilled.length*7);
     score-=Math.max(0,needNonbasic-nonbasics.length)*2;
     score-=Math.max(0,avgCmc-3.5)*7;
+    if(req.target_cmc!==null) score-=Math.max(0,Math.abs(avgCmc-req.target_cmc)-0.15)*12;
     score=Math.max(0,Math.min(95,Math.round(score)));
     const confidence=score>=78?'High':score>=61?'Medium':'Low';
     if(confidence==='Low') warnings.unshift('Low-confidence build: theme fit or card availability may make this deck underperform.');
-    const built={commander,main,basics,title,description,confidence,score,warnings,themeHits};
+    const built={commander,main,basics,title,description,confidence,score,warnings,themeHits,avgCmc,targetCmc:req.target_cmc};
     validateDeck(built);
     return deckView(built);
   }
   async generate(request,onProgress=()=>{}) {
+    const prompt=String(request.prompt||'').trim();
+    if(prompt.length>800) throw new DeckInputError('The deck description must be 800 characters or fewer.');
+    const interpreted=interpretPrompt(prompt);
+    const unique = (explicit, inferred, max) => [...new Map([...explicit,...inferred].map(value=>[lower(value),cleanTerm(value)])).values()].filter(Boolean).slice(0,max);
+    const target=request.target_cmc===null || request.target_cmc===undefined || request.target_cmc==='' ? null : Number(request.target_cmc);
     const req={
       colors:(request.colors||[]).map(c=>String(c).trim().toUpperCase()),
-      creature_types:(request.creature_types||[]).map(cleanTerm).filter(Boolean).slice(0,3),
-      keywords:(request.keywords||[]).map(cleanTerm).filter(Boolean).slice(0,5),
+      creature_types:unique(request.creature_types||[],interpreted.creature_types,3),
+      keywords:unique(request.keywords||[],interpreted.keywords,5),
+      prompt, target_cmc:target,
       commander:String(request.commander||'').trim(),
       favorites:(request.favorites||[]).map(name=>String(name).trim()).filter(Boolean),
       options:Number(request.options||4)
     };
     if(new Set(req.colors).size!==req.colors.length || req.colors.some(c=>!COLORS.includes(c)||c.length!==1))
       throw new DeckInputError('Colors must be unique choices from W, U, B, R, and G.');
+    if(req.target_cmc!==null && (!Number.isFinite(req.target_cmc) || req.target_cmc<1.5 || req.target_cmc>5.5))
+      throw new DeckInputError('Target average mana value must be between 1.5 and 5.5.');
     if(req.favorites.length>5 || !Number.isInteger(req.options) || req.options<1 || req.options>4)
       throw new DeckInputError('Enter up to five favorites and request between one and four decks.');
     onProgress('Looking up must-have cards and checking legality…');
@@ -447,6 +497,9 @@ export class BrowserGenerator {
       const key=identity(commander.color_identity)+'|'+req.creature_types.join(',')+'|'+req.keywords.join(',')+'|'+(req.keywords.length?'':commander.oracle_text);
       if(!cache.has(key)) cache.set(key,await this.pool(req,commander));
       decks.push(await this.build(req,commander,favorites,PROFILES[i],i,cache.get(key)));
+    }
+    if(prompt && !interpreted.creature_types.length && !interpreted.keywords.length && !request.creature_types?.length && !request.keywords?.length) {
+      for(const deck of decks) deck.warnings.push('The free-text request did not match recognized creature types or themes; add specific keywords for a closer fit.');
     }
     return decks;
   }
@@ -467,7 +520,8 @@ function deckView(deck) {
     groups.flatMap(group=>group.cards.map(card=>card.quantity+' '+card.name)).join('\n')+'\n';
   return {name:deck.commander.name+' — '+deck.title,commander:cardView(deck.commander),description:deck.description,
     confidence:deck.confidence,quality_score:deck.score,warnings:deck.warnings,theme_cards:deck.themeHits,
-    groups,total_cards:1+groups.reduce((sum,g)=>sum+g.cards.reduce((n,c)=>n+c.quantity,0),0), export:exportText};
+    groups,average_cmc:Number(deck.avgCmc.toFixed(2)),target_cmc:deck.targetCmc,
+    total_cards:1+groups.reduce((sum,g)=>sum+g.cards.reduce((n,c)=>n+c.quantity,0),0), export:exportText};
 }
 const shared=new BrowserGenerator();
 export async function generateDecks(request,onProgress) {return shared.generate(request,onProgress);}

@@ -2,7 +2,7 @@
 
 **Browser-only Commander deck generator. No installation, Python, login, or server needed for visitors.**
 
-The main app lives in [`site/`](site/). It generates up to four 100-card Magic: The Gathering Commander decks, using live card data from [Scryfall](https://scryfall.com/docs/api). Input selected colors, up to three creature types, up to five themes, a locked single commander, and/or five required cards. You can copy lists straight from the webpage without downloading anything.
+The main app lives in [`site/`](site/). It generates up to four 100-card Magic: The Gathering Commander decks, using live card data from [Scryfall](https://scryfall.com/docs/api). Input selected colors, up to three creature types, up to five themes, a locked single commander, and/or five required cards. Add an optional plain-English description and a target average mana value. You can copy lists straight from the webpage without downloading anything.
 
 ## Open in your browser
 
@@ -27,6 +27,9 @@ This does **not** require the player to download any files, run local software, 
 - Validates **100 cards total**, singleton nonbasic cards, paper Commander legality / bans, commander eligibility, and card color identity. Also checks **basic land subtype restrictions** required by Commander rule 903.5d.
 - A 37-land mana base and explicit allocation to ramp, card advantage, interaction, protection, sweepers, finishers, and synergy.
 - Confidence score and warnings are **heuristics, not playtested win-rate estimates**.
+- Browse deck cards as a **visual Scryfall card gallery** or as a compact list, with type-first / mana-value-first sorting. Artifact creatures appear with creatures and artifact lands with lands.
+- Optional **target average mana value** slider (1.5–5.5) rebalances the nonland 99 toward the chosen average, preserves required cards and role allocation, reports the actual result, and warns when the target cannot be closely reached. The commander and all lands are excluded from the calculation.
+- **Plain-English deck prompt** interprets supported creature types and themes locally with explicit keyword matching. It does not silently send text to a paid AI service or understand every possible request; recognized themes are shown as you type. Explicit filters take priority.
 - Copy a decklist right from the browser; optional `.txt` export for deck sites that accept text imports.
 - No advertising, accounts, trackers, API keys, or user data uploads to this project. Card lookup queries go directly to Scryfall.
 
@@ -45,6 +48,8 @@ site/index.html          Browser UI
 site/app.js              Form, results, copy/export UI
 site/style.css           Responsive layout
 site/generator.mjs       Generator, Scryfall API adapter, rules validation
+site/intent.mjs          Local natural-language theme and creature parser
+site/presentation.mjs    Card-type, mana-value sorting, average calculation
 site/seeds.mjs           Theme aliases and curated role cards
 site/tests/              Offline Node.js tests using an injected fake Scryfall catalog
 .github/workflows/pages.yml   Automatic GitHub Pages publishing
