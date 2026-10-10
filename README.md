@@ -4,6 +4,15 @@
 
 The main app lives in [`site/`](site/). It generates up to four 100-card Magic: The Gathering Commander decks, using live card data from [Scryfall](https://scryfall.com/docs/api). Input selected colors, up to three creature types, up to five themes, a locked single commander, and/or five required cards. Add an optional plain-English description and a target average mana value. You can copy lists straight from the webpage without downloading anything.
 
+
+## New: cohesive builds and browser-local 1v1 playtesting
+
+**Deck cohesion (v0.4):** Card selection now identifies a dominant archetype when possible and prioritizes role cards that actually enable or pay off that engine. The generator searches specifically for key enablers and payoffs, favors commander/tribal compatibility, and reports **engine cohesion**, **enabler count**, **payoff count**, and warnings if an engine is too thin. The mana-curve rebalancer avoids trading away major synergy pieces merely to hit the requested average. A high score is **not** a guaranteed strong deck: card interactions and combos are estimated heuristically.
+
+**Local deck vault:** Click **Save to this browser** on a generated deck or paste a 100-card list with a Commander section into the import panel. Imported cards are validated against current Scryfall legality, singleton rules and commander identity. Up to 12 decks are stored in browser **localStorage**, not cookies (cookies are too small), without sending them to an application server. Decks are specific to this device/browser; clearing site data or using a private window erases them. Import supports lines like 1 Sol Ring or 1x Sol Ring and a Commander header; only single-card commanders are supported.
+
+**1v1 strategy simulator:** Select your deck and a saved opponent deck, then run **20 seeded simulated matches** and inspect a sample turn-by-turn log. The AI pilot makes heuristic casting, resource, removal, and attack decisions from card data. **This is not a rules engine and does not accurately execute Magic: The Gathering.** It approximates many aspects (colored mana, stack, timing, damage prevention, triggers, board wipes and blocking). Outcomes labelled **projected** are comparative board-state estimates. Simulated results are useful for rough mana curve / pressure exploration **only**, not win-rate predictions, balance verification, or proof that a combo works. The implementation runs in JavaScript in the visitor's browser and uses no paid AI API or uploaded decklist history.
+
 ## Open in your browser
 
 Once GitHub Pages is enabled, the site is published at:
