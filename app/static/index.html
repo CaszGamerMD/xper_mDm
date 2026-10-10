@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0e1118">
+  <title>xper_mDm · Commander Deck Forge</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">✦</span><span>xper<span class="mint">_mDm</span></span></div>
+    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.1</span></div>
+  </header>
+  <main class="layout">
+    <section class="intro">
+      <div class="eyebrow">BUILD WITH INTENTION</div>
+      <h1>Find your next <em>Commander</em> deck.</h1>
+      <p>Choose a color identity, favorite creature types, mechanics, a commander, or up to five must-have cards. Generate up to four legal 100-card decks with transparent quality checks.</p>
+    </section>
+    <div class="workbench">
+      <form id="builder" class="settings">
+        <div class="panelheading"><span>01</span><h2>Build parameters</h2></div>
+        <fieldset class="fieldgroup">
+          <legend>Color identity <small>Optional · exact when selected</small></legend>
+          <div class="mana" aria-label="Deck colors">
+            <button type="button" class="mana-chip white" data-color="W" aria-pressed="false"><span>☀</span> White</button>
+            <button type="button" class="mana-chip blue" data-color="U" aria-pressed="false"><span>◈</span> Blue</button>
+            <button type="button" class="mana-chip black" data-color="B" aria-pressed="false"><span>☠</span> Black</button>
+            <button type="button" class="mana-chip red" data-color="R" aria-pressed="false"><span>◆</span> Red</button>
+            <button type="button" class="mana-chip green" data-color="G" aria-pressed="false"><span>♣</span> Green</button>
+          </div>
+          <p class="hint">Leave unselected to let the builder find a matching commander. A colorless commander can be entered by name.</p>
+        </fieldset>
+        <div class="fieldgroup">
+          <label for="tribes">Creature types <small>Up to 3 · comma separated</small></label>
+          <input id="tribes" type="text" placeholder="Frog, Wizard, Dragon" maxlength="160" autocomplete="off">
+        </div>
+        <div class="fieldgroup">
+          <label for="mechanics">Keywords and themes <small>Up to 5 · comma separated</small></label>
+          <input id="mechanics" type="text" placeholder="Blink, landfall, +1/+1 counters" maxlength="240" autocomplete="off">
+        </div>
+        <div class="fieldgroup">
+          <label for="commander">Specific commander <small>Optional · locks all suggestions to this commander</small></label>
+          <input id="commander" type="text" placeholder="A legendary creature's name" maxlength="150" autocomplete="off">
+        </div>
+        <div class="fieldgroup">
+          <label for="favorites">Must-have cards <small>Up to 5 · one card name per line</small></label>
+          <textarea id="favorites" rows="4" placeholder="Doubling Season&#10;Parallel Lives&#10;Beast Within"></textarea>
+          <p class="hint">All listed cards must be Commander-legal and within your commander's color identity. Commas inside card names are fine.</p>
+        </div>
+        <div class="fieldgroup">
+          <label for="options">Number of deck ideas</label>
+          <select id="options"><option value="4">4 deck ideas</option><option value="3">3 deck ideas</option><option value="2">2 deck ideas</option><option value="1">1 deck idea</option></select>
+        </div>
+        <button id="submit" class="generate" type="submit"><span>✦</span><span id="submit-text">Forge decks</span><span class="arrow">↗</span></button>
+        <p class="legal-note">Legality: current Scryfall Commander data. Ratings estimate deck structure and theme fit, not actual win rate.</p>
+      </form>
+      <section class="results" id="results" aria-live="polite">
+        <div class="panelheading"><span>02</span><h2>Deck concepts</h2></div>
+        <div id="output" class="placeholder">
+          <div class="placeholder-art"><div class="deck-back one"></div><div class="deck-back two"></div><div class="deck-back three">✦</div></div>
+          <h3>A deck is waiting to be found.</h3>
+          <p>Tell the forge what you love playing and see up to four different builds, all checked for Commander deck-construction legality.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>Card information powered by <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer">Scryfall</a>. Magic: The Gathering and card art are property of Wizards of the Coast. Unofficial fan tool.</footer>
+</body>
+</html>
