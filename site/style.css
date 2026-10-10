@@ -39,3 +39,23 @@
 .cardgroup .sorted-list td.type-cell{color:var(--muted);text-align:left;white-space:normal;font-size:11px}
 .cardgroup .sorted-list td.mana-cell{white-space:nowrap;text-align:right;color:var(--gold);font-variant-numeric:tabular-nums}
 @media(max-width:560px){.card-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:11px;padding:13px 10px}.cardgroup .sorted-list td.type-cell{display:none}.browser-controls{align-items:stretch}.sort-label{flex-wrap:wrap}.sort-select{max-width:100%}}
+
+/* Local deck vault and simulated strategy-playtest */
+.play-panel{margin-top:32px;padding:28px;border:1px solid var(--border);border-radius:14px;background:#171e28}
+.play-explain{line-height:1.65;color:var(--muted);font-size:13px;max-width:900px}
+.play-explain strong{color:var(--gold)}
+.play-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}
+.play-box{padding:18px;border:1px solid var(--border);border-radius:12px;background:#111923;display:flex;flex-direction:column;gap:10px;min-width:0}
+.play-box h3{margin:0 0 7px;font-size:17px}
+.play-box label{font-size:13px;font-weight:700}
+.play-box label small{color:var(--muted);font-size:11px;font-weight:400}
+.play-box input,.play-box select,.play-box textarea{width:100%;padding:10px 12px;min-height:42px;border:1px solid #3d4959;border-radius:8px;background:#0d141d;color:var(--text);font:inherit;max-width:100%}
+.play-box textarea{resize:vertical;min-height:130px;line-height:1.5}
+.play-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.play-results{padding:8px 0 12px}
+.play-results:empty{display:none}
+.play-results h3{font-size:17px}
+.play-log{border:1px solid var(--border);border-radius:10px;background:#0c131b}
+.play-log summary{cursor:pointer;padding:13px;font-weight:700;font-size:13px}
+.play-log pre{max-height:460px;overflow:auto;white-space:pre-wrap;padding:15px;margin:0;font-size:12px;line-height:1.75;color:#cedde7;border-top:1px solid var(--border)}
+@media(max-width:750px){.play-grid{grid-template-columns:1fr}.play-panel{padding:19px}}
