@@ -11,7 +11,7 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">✦</span><span>xper<span class="mint">_mDm</span></span></div>
-    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.3 · BROWSER EDITION</span></div>
+    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.4 · SYNERGY + PLAYTEST</span></div>
   </header>
   <main class="layout">
     <section class="intro">
@@ -77,6 +77,37 @@
         </div>
       </section>
     </div>
+    <section class="play-panel" id="playtest" aria-labelledby="playtest-title">
+      <div class="panelheading"><span>03</span><h2 id="playtest-title">Local deck vault &amp; AI playtest</h2></div>
+      <p class="play-explain">Save decks on this device, import another 100-card Commander list, and run a simulated 1v1 against a heuristic opponent pilot. This is a <strong>strategic approximation, not a fully rules-accurate Magic game</strong>: complex abilities, timing, targeting, colored mana, and combat rules are simplified. Results are directional, not real win rates.</p>
+      <div class="play-grid">
+        <div class="play-box">
+          <h3>My saved decks</h3>
+          <label for="play-your-deck">Your deck <small>Generated or locally saved</small></label>
+          <select id="play-your-deck"><option value="">Generate or save a deck first</option></select>
+          <label for="play-opponent-deck">Opponent deck <small>Choose a stored decklist</small></label>
+          <select id="play-opponent-deck"><option value="">Choose an opponent</option></select>
+          <div class="play-actions">
+            <button type="button" class="action" id="play-match">Run simulated 1v1</button>
+            <button type="button" class="action secondary" id="play-delete">Delete selected opponent</button>
+          </div>
+          <p id="vault-status" class="hint" aria-live="polite"></p>
+        </div>
+        <form class="play-box" id="import-deck-form">
+          <h3>Import an opponent</h3>
+          <label for="import-title">Deck name <small>Optional</small></label>
+          <input id="import-title" maxlength="100" placeholder="My friend's token deck">
+          <label for="import-commander">Commander name <small>Or include a Commander section in the list</small></label>
+          <input id="import-commander" maxlength="150" placeholder="Atraxa, Praetors' Voice">
+          <label for="import-list">Decklist <small>One line per card: 1 Card Name / 1x Card Name</small></label>
+          <textarea id="import-list" rows="7" placeholder="// Commander&#10;1 Atraxa, Praetors' Voice&#10;&#10;// Deck&#10;1 Sol Ring&#10;..."></textarea>
+          <button type="submit" class="action" id="import-submit">Verify &amp; save to this browser</button>
+          <p id="import-status" class="hint" aria-live="polite"></p>
+        </form>
+      </div>
+      <div id="play-results" class="play-results" aria-live="polite"></div>
+      <p class="hint">Saved lists use <strong>localStorage</strong> instead of cookies (cookies are too small for complete decks). Nothing is uploaded to our server. Saved lists remain on this browser until you clear site data, browse privately, or delete them; they do not sync across devices. A maximum of 12 decks is retained.</p>
+    </section>
   </main>
   <footer>Card information powered by <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer">Scryfall</a>. Magic: The Gathering and card art are property of Wizards of the Coast. Unofficial fan tool.</footer>
 </body>
