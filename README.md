@@ -1,64 +1,61 @@
 # xper_mDm · Commander Deck Forge
 
-A locally runnable web app that generates **up to four 100-card Magic: The Gathering Commander decks** based on a desired color identity, creature types, keywords/themes, a specific commander, and up to **five required cards**.
+**Browser-only Commander deck generator. No installation, Python, login, or server needed for visitors.**
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-server-009688)
+The main app lives in [`site/`](site/). It generates up to four 100-card Magic: The Gathering Commander decks, using live card data from [Scryfall](https://scryfall.com/docs/api). Input selected colors, up to three creature types, up to five themes, a locked single commander, and/or five required cards. You can copy lists straight from the webpage without downloading anything.
+
+## Open in your browser
+
+Once GitHub Pages is enabled, the site is published at:
+
+**https://caszgamermd.github.io/xper_mDm/**
+
+If this link is not live yet, the repository owner needs to do the one-time setting:
+
+1. Open [Repository Settings → Pages](https://github.com/CaszGamerMD/xper_mDm/settings/pages).
+2. Under **Build and deployment**, choose **GitHub Actions** as the **Source**.
+3. Open the [Publish Browser Commander Deck Forge workflow](https://github.com/CaszGamerMD/xper_mDm/actions/workflows/pages.yml) and run it with **Run workflow** (or push another commit to `main`).
+4. When the workflow reports a successful deployment, open the site link above. Future changes to `site/` on `main` deploy automatically.
+
+This does **not** require the player to download any files, run local software, or install dependencies. GitHub Pages serves plain HTML, CSS, and JavaScript. The browser talks directly to Scryfall over HTTPS. Live card search does require an internet connection. The app is not available offline.
 
 ## Features
 
-- **Flexible input:** leave colors blank for discovery, select an *exact* color identity, add up to three creature types and five mechanics, lock to a named legendary creature, and/or provide up to five required card names (one per line).
-- **Four deck directions:** Theme First, Balanced, Resilient, and Fast Engine. If a commander is specified, all four use that commander; otherwise, the tool tries to suggest different eligible commanders.
-- **Current Commander legality:** every exported deck is validated to have exactly 100 cards (one commander and 99 others), Commander-legal paper cards only, and no off-color cards or duplicate nonbasic names. Legality and card identities come from [Scryfall](https://scryfall.com/docs/api), including current bans.
-- **Deck composition:** a 37-land mana base, ramp, card advantage, interaction, protection, sweepers, finishers, and theme pieces. Familiar staples are combined with theme searches and commander-relevant cards. Mandatory cards are never silently excluded (except if one is already the commander).
-- **Confidence warnings:** an explicitly *heuristic* score based on role coverage, theme fit, mana curve, and land availability; weak decks receive a warning. This is **not a predicted win rate** or a substitute for playtesting.
-- **Export:** copy the decklist or download `.txt` for decklist import. Individual card names link to Scryfall.
+- Exact selected color identity or automatic commander search; when a commander is named it is used for all deck options.
+- User themes and creature types influence candidate searches and deck composition. Five required cards are guaranteed unless forbidden by Commander legality.
+- Four deck plans: **Theme First**, **Balanced**, **Resilient**, and **Fast Engine**.
+- Validates **100 cards total**, singleton nonbasic cards, paper Commander legality / bans, commander eligibility, and card color identity. Also checks **basic land subtype restrictions** required by Commander rule 903.5d.
+- A 37-land mana base and explicit allocation to ramp, card advantage, interaction, protection, sweepers, finishers, and synergy.
+- Confidence score and warnings are **heuristics, not playtested win-rate estimates**.
+- Copy a decklist right from the browser; optional `.txt` export for deck sites that accept text imports.
+- No advertising, accounts, trackers, API keys, or user data uploads to this project. Card lookup queries go directly to Scryfall.
 
-## Run it
+## Rules and limits
 
-Requires **Python 3.11+** and internet connectivity to Scryfall for live card data.
+This first release builds **one-commander** lists only; it does not construct partner/Background/Doctor's companion pairs, sideboard companions, or specialty deckbuilding exceptions. It aims for conservative legality, and never intentionally returns an incomplete list. It cannot prove card interactions actually work, nor predict power or competitive performance. Verify lists for special tournament requirements and check the current official Commander ban list when necessary.
 
-```bash
-python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+Data comes from live Scryfall searches (`legalities.commander` and paper-game status) and reflects its accuracy at generation time. Browser requests are rate spaced and cached in memory to respect [Scryfall's API usage limits](https://scryfall.com/docs/faqs/i-m-having-trouble-accessing-the-scryfall-api-or-i-m-blocked-17). If Scryfall or browser cross-origin access is unavailable, the app shows an error rather than constructing an unverified deck.
 
-Then visit **http://127.0.0.1:8000**. The local server serves the UI; no paid API key, separate JavaScript build process, or account is required.
+## Developing and testing
 
-To run tests:
-
-```bash
-pip install -r requirements-dev.txt
-pytest -q
-```
-
-## Design and constraints
-
-**Rules checked:** one eligible commander, exactly 100 total cards, singleton rule (basic lands excepted), card color identities contained within the commander's identity, and Scryfall's `legalities.commander == legal` and paper-game flag. The tool deliberately generates **single-commander** decks; it does not yet build Partner/Background/Doctor's companion pairs, external companion cards, or special overrides of singleton rules. A commander with Partner can be used alone.
-
-**Deck quality:** heuristic matching uses Oracle text, known keyword families, subtype matches, card popularity (`edhrec_rank`), approximate curve and a small set of role seed cards. Results are **complete and checked for construction legality, not mathematically optimized or playtested**. Highly unusual interactions and sparse tribes may get low-quality warnings; there is no bracket, budget, matchup, or metagame optimization yet. Nonbasic fixing is chosen using Scryfall-produced mana and supplemented with basics. Data quality depends on Scryfall's up-to-date card records.
-
-**API fairness:** Uses a descriptive `User-Agent`, an `Accept` header, 120 ms spacing between live API requests, a 500 ms delay between card-collection batches, and in-memory 24-hour caching. Searches are bounded to at most two pages; it does **not** crawl the whole card database. Heavy production deployment should switch to Scryfall's bulk-data exports and an indexed local catalog rather than scaling live requests.
-
-**External service:** data from [Scryfall](https://scryfall.com) (unofficial fan project). Magic: The Gathering and all card art are owned by Wizards of the Coast. You should always reconfirm current legality before a sanctioned event or tournament.
-
-## Known limitations
-
-- The current algorithm searches live card text/rankings and can't guarantee a powerful or synergistic deck. Confidence warns when role or theme signals look poor.
-- Mana base and curve are heuristic; no simulated opening hands or pip-weighted source calculations.
-- Each deck uses one commander (no co-commanders), and specialty deck-building exceptions beyond basic lands aren't actively generated.
-- Live Scryfall availability is required on a first run; transient rate-limit / network errors are shown rather than producing guessed or partial lists.
-
-## Project layout
+The new browser app requires **no build tooling** and lives in:
 
 ```text
-app/main.py          FastAPI routes
-app/scryfall.py      Card types, Scryfall access, caching and throttling
-app/generator.py     Commander selection, deck construction and validation
-app/seeds.py         Theme aliases and role cards
-app/static/          Responsive web frontend
- tests/              Offline legality and builder tests
+site/index.html          Browser UI
+site/app.js              Form, results, copy/export UI
+site/style.css           Responsive layout
+site/generator.mjs       Generator, Scryfall API adapter, rules validation
+site/seeds.mjs           Theme aliases and curated role cards
+site/tests/              Offline Node.js tests using an injected fake Scryfall catalog
+.github/workflows/pages.yml   Automatic GitHub Pages publishing
 ```
+
+To run optional development tests with Node.js 22 or newer:
+
+```bash
+node --test site/tests/*.test.mjs
+```
+
+`app/`, `tests/`, and the Python dependencies are retained as the **older optional FastAPI prototype** and its tests. They are **not used or installed** by the browser app or GitHub Pages.
+
+Magic: The Gathering, its trademarks, and card artwork belong to Wizards of the Coast. Card data and images provided by Scryfall. Unofficial fan project.
