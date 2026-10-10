@@ -30,7 +30,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site
-          cp site/index.html site/app.js site/style.css site/generator.mjs site/seeds.mjs site/intent.mjs site/presentation.mjs site/.nojekyll _site/
+          cp site/index.html site/app.js site/style.css site/generator.mjs site/seeds.mjs site/intent.mjs site/presentation.mjs site/synergy.mjs site/playtest.mjs site/.nojekyll _site/
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static website
