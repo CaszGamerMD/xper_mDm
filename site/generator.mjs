@@ -5,6 +5,7 @@
 import { BASICS, ROLE_SEEDS, ROLE_QUERIES, THEMES } from './seeds.mjs';
 import { interpretPrompt } from './intent.mjs';
 import { averageSpellManaValue } from './presentation.mjs';
+import { deckPlan, synergyFeatures, cohesionReport, THEME_SEARCHES } from './synergy.mjs';
 
 export const COLORS = 'WUBRG';
 export const ROLE_ORDER = ['ramp', 'draw', 'removal', 'protection', 'wipe', 'finisher', 'synergy'];
@@ -69,6 +70,7 @@ export function cardFromScryfall(raw) {
     land,
     basic: land && type.split(' // ')[0].split(' ').includes('Basic'),
     creature: type.includes('Creature'),
+    power: raw.power || faces[0]?.power || '', toughness: raw.toughness || faces[0]?.toughness || '',
     commander: (type.includes('Legendary') && type.includes('Creature')) || lower(text).includes('can be your commander'),
     eligible: raw.legalities?.commander === 'legal' && (raw.games || []).includes('paper')
   };
@@ -192,12 +194,13 @@ function noise(card, variant) {
   for (const char of card.oracle_id + ':' + variant) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return (hash >>> 0)/2**32;
 }
-function cardScore(card,role,theme,variant) {
+function cardScore(card,role,theme,variant,structural=0,hasPlan=false) {
   const popular=Math.max(0,5.6-Math.log10(Math.max(card.edhrec_rank,1))*.92);
   let curve=card.cmc>=1&&card.cmc<=4?1.1:card.cmc>=8?-1:0;
   if (role==='finisher') curve=card.cmc>=4&&card.cmc<=8?1.2:0;
   if (role==='ramp' && card.cmc>3) curve-= (card.cmc-3)*.55;
-  return popular+theme*(role==='synergy'?1.2:.4)+curve+[.35,.65,.45,1.35][variant]*noise(card,variant)*2;
+  const planBonus=hasPlan ? structural*(role==='synergy'?1.45:.75) - (role==='synergy' && !structural?8:0) : 0;
+  return popular+theme*(role==='synergy'?1.0:.3)+planBonus+curve+[.35,.65,.45,1.35][variant]*noise(card,variant)*1.4;
 }
 
 export function validateDeck(deck) {
@@ -291,6 +294,7 @@ export class BrowserGenerator {
   async pool(req,commander) {
     const filterId='id<='+identity(commander.color_identity);
     const terms=this.themes(req,commander);
+    const plan=deckPlan(req.keywords,commander);
     const spells=new Map();
     const add=cards=>{for(const c of cards) if(c.eligible && withinIdentity(c,commander) && !c.land) spells.set(c.oracle_id,c);};
     add(await this.getSeeds());
@@ -299,11 +303,13 @@ export class BrowserGenerator {
       add(await this.source.search(`${filterId} o:${safeQuote(kind)} -t:land`,160));
     }
     for(const term of terms.slice(0,5)) add(await this.source.search(`${filterId} o:${safeQuote(term)} -t:land`,160));
+    // Collect genuine enablers and payoffs for a chosen engine, not just coincidental text matches.
+    for(const q of (THEME_SEARCHES[plan] || []).slice(0,2)) add(await this.source.search(`${filterId} ${q} -t:land`,140));
     for(const role of ['ramp','draw','removal'])
       for(const q of ROLE_QUERIES[role]) add(await this.source.search(`${filterId} ${q}`,100));
     add(await this.source.search(`${filterId} -t:land`,175));
     const lands=(await this.source.search(`${filterId} t:land -t:basic`,160)).filter(c=>c.land && c.eligible && withinIdentity(c,commander));
-    return [[...spells.values()].filter(c=>normalized(c)!==normalized(commander)),lands,terms];
+    return [[...spells.values()].filter(c=>normalized(c)!==normalized(commander)),lands,terms,plan];
   }
   pickNonbasics(lands,commander,variant,required,taken) {
     const colors=new Set(commander.color_identity);
@@ -337,7 +343,7 @@ export class BrowserGenerator {
     return 'synergy';
   }
   /** Keep roles, favorite cards and singleton rules while steering the 62 spells toward a target curve. */
-  rebalanceCurve(spells, spellPool, pinnedNames, target, req, terms, variant) {
+  rebalanceCurve(spells, spellPool, pinnedNames, target, req, terms, variant, plan=null, commander={}) {
     if (target === null) return spells;
     const goal=spells.length*target;
     let sum=spells.reduce((n,[card])=>n+card.cmc,0);
@@ -357,10 +363,12 @@ export class BrowserGenerator {
           const improved=before-Math.abs(nextSum-goal);
           if(improved<=0) continue;
           const newTheme=themeScore(option,req.creature_types,terms);
-          if(role==='synergy' && oldTheme>=5 && newTheme===0) continue;
+          const oldStructure=synergyFeatures(previous,plan,req.creature_types,commander).score;
+          const nextStructure=synergyFeatures(option,plan,req.creature_types,commander).score;
+          if(role==='synergy' && (oldTheme>=5 && newTheme===0 || oldStructure>=6 && nextStructure<6)) continue;
           const thematicLoss=Math.max(0,oldTheme-newTheme)*.035;
           const qualityLoss=Math.max(0,cardScore(previous,role,oldTheme,variant)-cardScore(option,role,newTheme,variant))*.013;
-          const gain=improved-thematicLoss-qualityLoss;
+          const gain=improved-thematicLoss-qualityLoss-Math.max(0,oldStructure-nextStructure)*.065;
           if(gain>bestGain+0.00001){ bestGain=gain;best={i,option,nextSum,previous,role}; }
         }
       }
@@ -374,7 +382,9 @@ export class BrowserGenerator {
   }
   async build(req,commander,favorites,profile,variant,pool) {
     const [title,description,targets]=profile;
-    const [spellPool,landPool,terms]=pool;
+    const [spellPool,landPool,terms,plan]=pool;
+    const structure=card=>synergyFeatures(card,plan,req.creature_types,commander).score;
+    const quality=(card,role)=>cardScore(card,role,themeScore(card,req.creature_types,terms),variant,structure(card),Boolean(plan));
     const selected=[];
     const taken=new Set([normalized(commander)]);
     const defaultBasics=new Set(Object.values(BASICS).map(lower));
@@ -401,14 +411,14 @@ export class BrowserGenerator {
     for(const role of ROLE_ORDER) {
       const need=Math.max(0,targets[role]-(counted[role]||0));
       const matching=available.filter(c=>roleMatch(c,role));
-      matching.sort((a,b)=>cardScore(b,role,themeScore(b,req.creature_types,terms),variant)-cardScore(a,role,themeScore(a,req.creature_types,terms),variant));
+      matching.sort((a,b)=>quality(b,role)-quality(a,role));
       const additions=matching.slice(0,need);
       if(additions.length<need) unfilled.push(role);
       for(const c of additions){spells.push([c,role]);taken.add(normalized(c));counted[role]++;}
       available=available.filter(c=>!taken.has(normalized(c)));
     }
     if(spells.length<62) {
-      available.sort((a,b)=>cardScore(b,'synergy',themeScore(b,req.creature_types,terms),variant)-cardScore(a,'synergy',themeScore(a,req.creature_types,terms),variant));
+      available.sort((a,b)=>quality(b,'synergy')-quality(a,'synergy'));
       for(const c of available.slice(0,62-spells.length)) {spells.push([c,'synergy']);taken.add(normalized(c));}
     }
     if(spells.length<62) throw new DeckInputError('Not enough distinct legal spells for a complete deck. Try broader inputs.');
@@ -417,7 +427,7 @@ export class BrowserGenerator {
       const extra=spells.filter(([c])=>!pinnedNames.has(normalized(c)));
       spells=[...pinned,...extra.slice(0,62-pinned.length)];
     }
-    spells=this.rebalanceCurve(spells,spellPool.filter(c=>withinIdentity(c,commander)),pinnedNames,req.target_cmc,req,terms,variant);
+    spells=this.rebalanceCurve(spells,spellPool.filter(c=>withinIdentity(c,commander)),pinnedNames,req.target_cmc,req,terms,variant,plan,commander);
     const targetLands=({0:17,1:11,2:19,3:24,4:26,5:28}[commander.color_identity.length] || 17) + (variant===3?1:0);
     const needNonbasic=Math.max(0,targetLands-pinnedLands.length);
     const nonbasics=this.pickNonbasics(landPool,commander,variant,needNonbasic,taken);
@@ -440,6 +450,8 @@ export class BrowserGenerator {
       if(!basics.some(([c])=>normalized(c)===requested)) throw new DeckInputError('Could not include requested basic land: '+requested);
     }
     const themeHits=spells.filter(([c])=>themeScore(c,req.creature_types,terms)>=2).length;
+    const cohesion=cohesionReport(spells.map(([c])=>c),plan,req.creature_types,commander);
+    warnings.push(...cohesion.warnings);
     const intent=Boolean(req.creature_types.length||req.keywords.length||terms.length);
     const fraction=themeHits/62;
     if(intent&&fraction<.33) warnings.push('Theme support is thin: relatively few cards match the requested mechanics or creature types.');
@@ -455,11 +467,12 @@ export class BrowserGenerator {
     score-=Math.min(25,unfilled.length*7);
     score-=Math.max(0,needNonbasic-nonbasics.length)*2;
     score-=Math.max(0,avgCmc-3.5)*7;
+    if(plan) score-=Math.round((100-cohesion.score)*.30);
     if(req.target_cmc!==null) score-=Math.max(0,Math.abs(avgCmc-req.target_cmc)-0.15)*12;
     score=Math.max(0,Math.min(95,Math.round(score)));
     const confidence=score>=78?'High':score>=61?'Medium':'Low';
     if(confidence==='Low') warnings.unshift('Low-confidence build: theme fit or card availability may make this deck underperform.');
-    const built={commander,main,basics,title,description,confidence,score,warnings,themeHits,avgCmc,targetCmc:req.target_cmc};
+    const built={commander,main,basics,title,description,confidence,score,warnings,themeHits,avgCmc,targetCmc:req.target_cmc,cohesion};
     validateDeck(built);
     return deckView(built);
   }
@@ -507,6 +520,7 @@ export class BrowserGenerator {
 
 function cardView(card, quantity=1) {
   return {name:card.name,quantity,mana_cost:card.mana_cost,cmc:card.cmc,type:card.type_line,
+    oracle_text:card.oracle_text || '',keywords:card.keywords || [],power:card.power || '',toughness:card.toughness || '',
     image:card.image,url:card.url,color_identity:card.color_identity};
 }
 function deckView(deck) {
@@ -520,7 +534,7 @@ function deckView(deck) {
     groups.flatMap(group=>group.cards.map(card=>card.quantity+' '+card.name)).join('\n')+'\n';
   return {name:deck.commander.name+' — '+deck.title,commander:cardView(deck.commander),description:deck.description,
     confidence:deck.confidence,quality_score:deck.score,warnings:deck.warnings,theme_cards:deck.themeHits,
-    groups,average_cmc:Number(deck.avgCmc.toFixed(2)),target_cmc:deck.targetCmc,
+    groups,cohesion:deck.cohesion,average_cmc:Number(deck.avgCmc.toFixed(2)),target_cmc:deck.targetCmc,
     total_cards:1+groups.reduce((sum,g)=>sum+g.cards.reduce((n,c)=>n+c.quantity,0),0), export:exportText};
 }
 const shared=new BrowserGenerator();
