@@ -1,6 +1,7 @@
 import { generateDecks } from "./generator.mjs";
 import { sortedCardGroups } from "./presentation.mjs";
 import { interpretPrompt } from "./intent.mjs";
+import {DeckLibrary, importDecklist, simulateSeries} from "./playtest.mjs";
 const form = document.getElementById('builder');
 const output = document.getElementById('output');
 const submit = document.getElementById('submit');
@@ -107,12 +108,14 @@ function render() {
     ['Confidence', deck.confidence, deck.confidence === 'Low'],
     ['Structure score', `${deck.quality_score}/100`, deck.quality_score < 61],
     ['Theme cards', deck.theme_cards, false],
+    ['Engine cohesion', deck.cohesion ? `${deck.cohesion.score}/100` : '—', deck.cohesion && deck.cohesion.score < 50],
     ['Avg. mana value', Number(deck.average_cmc).toFixed(2), deck.target_cmc !== null && Math.abs(deck.average_cmc - deck.target_cmc) > .2]
   ]) {
     const m = elt('div', 'metric' + (flagged ? ' warning' : ''));
     m.append(elt('strong', '', value), elt('span', '', label)); metrics.append(m);
   }
   meta.append(metrics);
+  if (deck.cohesion) meta.append(elt('p','curve-outcome', `Core strategy: ${deck.cohesion.plan} · ${deck.cohesion.enablers} enablers · ${deck.cohesion.payoffs} payoffs · ${deck.cohesion.connected} connected spells.`));
   if (deck.target_cmc !== null) meta.append(elt('p','curve-outcome', `Target average: ${deck.target_cmc.toFixed(1)} · Actual: ${deck.average_cmc.toFixed(2)} (excludes commander and lands)`));
   const actions = elt('div', 'deck-actions');
   actions.append(button('↓ Download .txt', () => {
@@ -124,7 +127,10 @@ function render() {
   }), button('⧉ Copy decklist', async () => {
     try { await navigator.clipboard.writeText(deck.export); }
     catch { const editor = elt('textarea'); editor.value = deck.export; document.body.append(editor); editor.select(); document.execCommand('copy'); editor.remove(); }
-  }, true));
+  }, true), button('♡ Save to this browser', () => {
+    try{vault.save(deck);refreshVault();showVaultStatus('Saved '+deck.name+' locally.');}
+    catch(error){showVaultStatus(error.message);}
+  },true));
   meta.append(actions); hero.append(meta); output.append(hero);
   if (deck.warnings.length) {
     const warnings = elt('div', 'warningbox');
@@ -187,5 +193,87 @@ function render() {
     browse.append(details);
   }
   output.append(browse);
-  output.append(elt('p', 'attribution', 'Every card was checked for paper Commander legality and color identity when generated. This score is a heuristic for construction quality—not a guaranteed power level, metagame ranking, or playtest result.'));
+  output.append(elt('p', 'attribution', 'Every card was checked for paper Commander legality and color identity when generated. Synergy and playtest ratings are heuristic estimates, not true game outcomes.'));
+  refreshVault();
 }
+
+
+// Browser-only personal deck library: localStorage is preferable to cookies for 100-card lists.
+let vault;
+try { vault=new DeckLibrary(window.localStorage); }
+catch {vault=new DeckLibrary({getItem:()=>null,setItem:()=>{throw new Error('Local storage is disabled.');}});}
+const mySelect=document.getElementById('play-your-deck');
+const opponentSelect=document.getElementById('play-opponent-deck');
+function showVaultStatus(message){document.getElementById('vault-status').textContent=message;}
+function refillSelect(select,records,placeholder) {
+  const previous=select.value;
+  select.replaceChildren();
+  const empty=elt('option','',placeholder);empty.value='';select.append(empty);
+  for(const item of records){
+    const option=elt('option','',item.name);
+    option.value=item.id;select.append(option);
+  }
+  if(records.some(item=>item.id===previous))select.value=previous;
+}
+function refreshVault() {
+  const generated=decks.map((deck,index)=>({id:'generated:'+index,name:'New: '+deck.name}));
+  const saved=vault.list().map(item=>({id:'saved:'+item.id,name:'Saved: '+item.name}));
+  refillSelect(mySelect,[...generated,...saved],'Choose your deck');
+  refillSelect(opponentSelect,saved,'Choose a saved opponent');
+  if(!mySelect.value && generated.length)mySelect.value=generated[chosen].id;
+}
+function resolveDeck(value) {
+  if(value.startsWith('generated:'))return decks[Number(value.split(':')[1])]||null;
+  if(value.startsWith('saved:'))return vault.get(value.slice(6));
+  return null;
+}
+refreshVault();
+document.getElementById('import-deck-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const button=document.getElementById('import-submit');
+  const status=document.getElementById('import-status');
+  button.disabled=true;status.textContent='Looking up every card and checking Commander legality…';
+  try{
+    const deck=await importDecklist(
+      document.getElementById('import-list').value,
+      document.getElementById('import-commander').value.trim());
+    const name=document.getElementById('import-title').value.trim()||deck.name;
+    const id=vault.save(deck,name);
+    refreshVault();opponentSelect.value='saved:'+id;
+    status.textContent='Saved and ready as the opponent: '+name+'.';
+    document.getElementById('import-list').value='';
+  }catch(error){status.textContent='⚠ '+(error.message||'Could not import decklist.');}
+  finally{button.disabled=false;}
+});
+document.getElementById('play-delete').addEventListener('click',()=>{
+  if(!opponentSelect.value.startsWith('saved:'))return showVaultStatus('Select a saved opponent deck to delete.');
+  vault.remove(opponentSelect.value.slice(6));refreshVault();showVaultStatus('Removed that deck from this browser.');
+});
+document.getElementById('play-match').addEventListener('click',()=>{
+  const mine=resolveDeck(mySelect.value),theirs=resolveDeck(opponentSelect.value);
+  const section=document.getElementById('play-results');
+  section.replaceChildren();
+  if(!mine||!theirs){
+    section.append(elt('p','error','Choose your generated or saved deck, then import/select a saved opponent deck.'));
+    return;
+  }
+  try {
+    const series=simulateSeries(mine,theirs,20,41);
+    const heading=elt('h3','','20 simulated games · '+mine.commander.name+' vs '+theirs.commander.name);
+    const metrics=elt('div','metrics');
+    for(const [title,value] of [
+      ['Your modeled wins',series.wins],['Opponent modeled wins',series.losses],
+      ['Draws',series.draws],['Projected endings',series.projected]
+    ]) {
+      const m=elt('div','metric');m.append(elt('strong','',value),elt('span','',title));metrics.append(m);
+    }
+    section.append(heading,metrics,elt('p','hint',
+      'These counts are NOT competitive win-rate predictions: the AI uses approximate mana, combat, spell effects and threat evaluation. Inspect the sample game to spot curve and interaction problems.'));
+    const details=elt('details','play-log');
+    details.open=true;
+    details.append(elt('summary','','Sample game · '+series.example.turn+' turns · result: '+series.example.winner+
+      (series.example.projected?' (projected)':'')));
+    const pre=elt('pre','',series.example.log.join('\n'));
+    details.append(pre);section.append(details);
+  }catch(error){section.append(elt('p','error',error.message||'Simulation could not run.'));}
+});
