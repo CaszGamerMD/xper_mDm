@@ -384,7 +384,7 @@ export class BrowserGenerator {
     const [title,description,targets]=profile;
     const [spellPool,landPool,terms,plan]=pool;
     const structure=card=>synergyFeatures(card,plan,req.creature_types,commander).score;
-    const quality=(card,role)=>cardScore(card,role,themeScore(card,req.creature_types,terms),variant,structure(card),Boolean(plan));
+    const quality=(card,role)=>cardScore(card,role,themeScore(card,req.creature_types,terms),variant,structure(card),Boolean(plan||req.creature_types.length));
     const selected=[];
     const taken=new Set([normalized(commander)]);
     const defaultBasics=new Set(Object.values(BASICS).map(lower));
@@ -467,7 +467,7 @@ export class BrowserGenerator {
     score-=Math.min(25,unfilled.length*7);
     score-=Math.max(0,needNonbasic-nonbasics.length)*2;
     score-=Math.max(0,avgCmc-3.5)*7;
-    if(plan) score-=Math.round((100-cohesion.score)*.30);
+    if(plan||req.creature_types.length) score-=Math.round((100-cohesion.score)*.30);
     if(req.target_cmc!==null) score-=Math.max(0,Math.abs(avgCmc-req.target_cmc)-0.15)*12;
     score=Math.max(0,Math.min(95,Math.round(score)));
     const confidence=score>=78?'High':score>=61?'Medium':'Low';
