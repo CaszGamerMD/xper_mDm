@@ -122,3 +122,54 @@ test('misidentified or illegal imported cards stop optimization before any sugge
   await assert.rejects(()=>doctor.diagnose(input.replace('1 Vanilla 0','1 Off Color')),
     /illegal in the selected commander identity/);
 });
+
+
+test('20-swap setting bounds pair evaluations, keeps a legal 100-card deck, and is not a quota',()=>{
+  const original=badDeck();
+  const pool=[...improvements,
+    ...Array.from({length:160},(_,i)=>card('Generic '+i,'Artifact','Draw a card.',3))];
+  const proposed=improveCards(original,originalLeader,pool,{maxSwaps:20});
+  assert.equal(proposed.cards.length,99);
+  assert.equal(proposed.commander.name,originalLeader.name);
+  assert.ok(proposed.swaps.length<=20);
+  assert.ok(proposed.evaluations<=20*36*32,
+    'The search should examine bounded candidate pairs rather than every card against the whole pool.');
+  assert.ok(proposed.swaps.every(s=>s.evidence));
+  assert.ok(proposed.after.score>=proposed.before.score);
+  const seen=new Set();
+  for(const c of proposed.cards)if(!c.basic){
+    assert.ok(!seen.has(c.name));
+    seen.add(c.name);
+  }
+});
+test('protect known token enablers and payoffs when fixing missing roles',()=>{
+  const original=badDeck();
+  const proposed=improveCards(original,originalLeader,improvements,{maxSwaps:12});
+  assert.ok(proposed.swaps.every(s=>!/^Maker |^Payoff /.test(s.out)),
+    'Do not dismantle recognized card engines for generic structural points');
+});
+test('land shortage warnings and optimizer target align on the same rating',()=>{
+  const commander={...originalLeader,cmc:5,mana_cost:'{3}{G}{G}'};
+  const other=badDeck().filter(c=>c.name!=='Forest');
+  const fillers=Array.from({length:69-other.length},(_,i)=>card('Filler '+i));
+  const list=[...Array(30).fill(forest),...other,...fillers];
+  assert.equal(list.length,99);
+  const rated=rateDeck(list,commander);
+  assert.ok(rated.land_target>30);
+  assert.ok(rated.warnings.some(w=>w.includes('Add '+(rated.land_target-rated.lands)+' land')));
+  const repaired=improveCards(list,commander,[forest],{maxSwaps:20});
+  assert.ok(repaired.after.lands>30,'Land-short decks should get real spell→land recommendations');
+  assert.ok(repaired.after.lands<=repaired.after.land_target);
+  assert.ok(repaired.swaps.every(s=>s.reason==='Fix land count'));
+  assert.ok(repaired.after.score>rated.score);
+});
+test('responsive Deck Doctor optimize yields progress during extensive tuning',async()=>{
+  const source=new FakeSource();
+  const doctor=new DeckDoctor(source);
+  const input='// Commander\n1 Old Captain\n// Deck\n37 Forest\n'+
+    source.original.filter(c=>c.name!=='Forest').map(c=>'1 '+c.name).join('\n');
+  const messages=[];
+  const result=await doctor.diagnose(input,{maxSwaps:20,considerCommander:false},msg=>messages.push(msg));
+  assert.ok(messages.some(msg=>msg.includes('Checking verified swaps'))||result.swaps.length===0);
+  assert.ok(result.swaps.length<=20);
+});
