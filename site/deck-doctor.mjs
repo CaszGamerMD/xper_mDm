@@ -138,7 +138,7 @@ function scoreCore(cards,commander,context){
   }
   const engine=20*coh.score/100;
   const mana=manaBalance(cards,commander);
-  const countPoints=7*cap(1-Math.abs(lands.length-37)/12);
+  const countPoints=9*cap(1-Math.abs(lands.length-37)/11);
   const colorPoints=5*mana.score;
   const landPoints=countPoints+colorPoints;
   const curvePoints=6*cap(1-Math.abs(avg-3.0)/2.3);
@@ -230,7 +230,7 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,
         const next=scoreCore(selected,leader,ctx);
         selected[i]=old;
         const gain=next.score-state.score;
-        if(gain<minGain)continue;
+        if(gain<(isLand(old)&&isLand(c)?.08:minGain))continue;
         // A role-preserving swap is preferred in close ties, and one cannot
         // change the same position repeatedly without improving the score.
         const preference=(role(c)===oldRole?.12:0)+(isLand(c)===isLand(old)?.06:0);
