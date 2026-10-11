@@ -111,7 +111,7 @@ function newPlayer(deck,random){
   const library=shuffle(expandMain(deck),random);
   const hand=library.splice(0,7);
   return {name:deck.commander.name,commander:{...deck.commander},library,hand,
-    battlefield:[],graveyard:[],life:40,landDrops:0,commanderTax:0,
+    battlefield:[],graveyard:[],exile:[],life:40,landDrops:0,commanderTax:0,
     commanderInZone:true,commanderDamage:0,turns:0,mulligans:0,kept:false};
 }
 export class LiveDuel {
@@ -120,7 +120,7 @@ export class LiveDuel {
     this.random=randomizer(seed);this.players=[newPlayer(mine,this.random),newPlayer(opponent,this.random)];
     this.id=0;this.round=1;this.serial=0;this.phase='opening';this.winner=null;
     this.log=['Practice match prepared. This is a simplified rules sandbox, not full Magic.'];
-    this.pendingAttack=[];this.attackOwner=0;this.humanAttacked=false;
+    this.pendingAttack=[];this.attackOwner=0;this.humanAttacked=false;this.pendingAi=null;
     this.playerManaBonus=0;this.usedBonus=0;
     const bot=this.players[1];
     while(bot.mulligans<3 && (this._landCount(bot.hand)<2||this._landCount(bot.hand)>5))this._mulligan(1);
@@ -372,7 +372,20 @@ export class LiveDuel {
     if(/destroy all creatures/.test(t))score+=enemy.battlefield.length>bot.battlefield.length+1?18:-20;
     return score;
   }
-  _botPlay(){
+  _botActionNeedsReview(card){
+    // These simulated effects may alter the human's life, cards or battlefield.
+    return /destroy target|exile target|return target|damage to target|destroy all creatures|exile all creatures|each creature|each opponent|target opponent|target player|deals? \d+ damage/i.test(textOf(card));
+  }
+  confirmAiAction(){
+    this._require('confirm-ai');
+    if(!this.pendingAi)throw new DeckInputError('There is no AI action to review.');
+    const approved=this.pendingAi;
+    this.pendingAi=null;this.phase='bot';
+    this._log('You acknowledged AI action: '+approved.card.name+'.');
+    this._botPlay(approved);
+    return this.view();
+  }
+  _botPlay(approved=null){
     const bot=this.players[1];
     const lands=bot.hand.map((c,i)=>({c,i})).filter(x=>isLand(x.c));
     if(lands.length&&bot.landDrops===0){
@@ -383,12 +396,26 @@ export class LiveDuel {
       this._log('AI plays '+chosen.c.name+'.');
     }
     for(let plays=0;plays<8&&!this.winner;plays++){
+      if(approved){
+        this._cast(1,approved.index,approved.command);
+        approved=null;
+        if(this.winner)return;
+        continue;
+      }
       const options=bot.hand.map((c,i)=>({c,i,command:false}))
         .filter(x=>!isLand(x.c)&&this.canCast(1,x.c));
       if(bot.commanderInZone&&this.canCast(1,bot.commander,true))options.push({c:bot.commander,i:-1,command:true});
       if(!options.length)break;
       options.sort((a,b)=>this._botScore(b.c)-this._botScore(a.c));
       const choice=options[0];
+      if(this._botActionNeedsReview(choice.c)){
+        this.pendingAi={index:choice.i,command:choice.command,card:choice.c,
+          description:'AI proposes to cast '+choice.c.name+
+            '. This may affect your creatures, cards or life total. Review and acknowledge before it resolves.'};
+        this.phase='confirm-ai';
+        this._log('Waiting for your acknowledgement of '+choice.c.name+'.');
+        return;
+      }
       this._cast(1,choice.i,choice.command);
       if(this.winner)return;
     }
@@ -432,6 +459,9 @@ export class LiveDuel {
   view(){
     const players=this.players.map((p,i)=>({
       name:p.name,life:p.life,library:p.library.length,graveyard:p.graveyard.length,
+      graveyardCards:p.graveyard.map(c=>({...c})),
+      exileCards:(p.exile||[]).map(c=>({...c})),
+      commandZoneCards:p.commanderInZone?[{...p.commander}]:[],
       handCount:p.hand.length,hand:i===0?p.hand.map(c=>({...c})):[],
       battlefield:p.battlefield.map(o=>({...o,card:{...o.card}})),
       commander:p.commander,commanderInZone:p.commanderInZone,commanderTax:p.commanderTax,
@@ -443,6 +473,7 @@ export class LiveDuel {
       players,attackers:this.pendingAttack.slice(),canMulligan:this.phase==='opening'&&(this.mulliganMode==='friendly'||this.players[0].mulligans<8),
       mulliganMode:this.mulliganMode,mulligans:this.players[0].mulligans,
       bottomRequired:this.phase==='bottom'?bottomRequired(this.mulliganMode,this.players[0].mulligans):0,
-      humanAttacked:this.humanAttacked};
+      humanAttacked:this.humanAttacked,
+      pendingAi:this.pendingAi?{card:{...this.pendingAi.card},description:this.pendingAi.description}:null};
   }
 }
