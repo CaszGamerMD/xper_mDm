@@ -8,6 +8,17 @@ The main app lives in [`site/`](site/). It generates up to four 100-card Magic: 
 
 
 
+
+## Deck Doctor: rate and conservatively upgrade uploaded Commander decks (v0.8)
+
+In **Deck Doctor · Rate & improve your deck**, upload a plain-text decklist (TXT, DEK, DEC) or paste an exported list. Enter the commander by name or use a Commander section. The tool verifies the **99-card main deck + 1 single commander** against live Scryfall data, including Commander legality, color identity, land types and singleton requirements. It supports conventional numbered exports (for example, 1 Sol Ring or 1x Sol Ring) and basic land multiples; specialty deck exceptions may require more work.
+
+The report shows transparent **0–100 construction scores** for the original and proposed versions, estimated ramp/draw/removal/protection/wipe/finisher density, inferred tribe and strategy, mana curve, mana-base size, engine cohesion and commander fit. It searches for legal replacements and greedily selects one-for-one changes using the **same scoring criteria** throughout. Choose a maximum of 0, 4, 8 (default), 12 or 20 changes. It leaves cards alone if no replacement provides sufficient estimated improvement. Reports show removed and added names, estimated improvements and the number of original cards retained. You can copy, save or open your tuned deck for AI practice.
+
+**Commander protection:** The submitted commander stays in the main improved list. Optionally, Deck Doctor tests other commanders against the **unchanged original 99 cards**. Only a candidate that keeps all cards and lands legal and improves the construction score by **at least 15 points** is offered. Such commanders appear as optional commander-only alternatives with separate exports. There is never an automatic hidden commander swap.
+
+**Limitations:** These are estimated **deck-construction** and **text-recognizable synergy** scores, not measured win rates or confirmation that combos work. Card-search candidates are a nonexhaustive subset of Scryfall and greedy search is not a globally optimal solver. Scores are comparable *within the same analysis*, not claims of general competitive power. Uploaded decklist text remains in your browser; individual card names are queried against Scryfall directly.
+
 ## Builder comfort and opening mulligans (v0.7)
 
 **Start over · clear builder** resets colors, creature types, mechanic choices, the commander, must-have cards, the deck description, target mana value and generated deck results. It does **not** erase the local saved-deck vault or your card display preferences. If a previous generation is still running, its result is ignored so it cannot overwrite the cleared screen.
