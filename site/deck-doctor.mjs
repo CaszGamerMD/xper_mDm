@@ -76,6 +76,52 @@ function commanderFit(commander,cards,plan,tribes){
   const supportFraction=matched/Math.max(1,total);
   return Math.round(cap(score*(.45+.55*cap(supportFraction/.40)),0,20));
 }
+
+/** Color-demand and attainable mana sources, estimated from the printed cards.
+ * Land sources are counted once per color they can produce. Any-color lands
+ * count for each identity color; land-fetch effects count for matching typed basics.
+ * This is a mana-base estimate, not a turn-by-turn mana probability simulator.
+ */
+export function manaBalance(cards,commander){
+  const colors=(commander.color_identity||[]).filter(c=>'WUBRG'.includes(c));
+  const spells=[commander,...cards.filter(c=>!isLand(c))];
+  const lands=cards.filter(isLand);
+  const demand=Object.fromEntries(colors.map(c=>[c,0]));
+  const sources=Object.fromEntries(colors.map(c=>[c,0]));
+  const basicTypes={W:'Plains',U:'Island',B:'Swamp',R:'Mountain',G:'Forest'};
+  for(const spell of spells){
+    const costs=String(spell.mana_cost||'').match(/\{[^}]+\}/g)||[];
+    for(const symbol of costs){
+      const inside=symbol.slice(1,-1);
+      for(const c of colors)if(inside===c)demand[c]+=1;
+      // Hybrid/P tokens are approximate and each color shares their demand.
+      if(inside.includes('/'))for(const c of colors)if(inside.split('/').includes(c))demand[c]+=.5;
+    }
+  }
+  for(const land of lands){
+    const typ=String(land.type_line||land.type||'');
+    const oracle=lower(land.oracle_text);
+    const actual=new Set(land.produced_mana||[]);
+    for(const [c,name] of Object.entries(basicTypes))if(new RegExp('\\b'+name+'\\b').test(typ))
+      actual.add(c);
+    if(/add (?:one|two|three) mana of any (?:one )?color|add one mana of any type/.test(oracle))
+      colors.forEach(c=>actual.add(c));
+    if(/search your library for .*land card/.test(oracle)){
+      for(const [c,name] of Object.entries(basicTypes))
+        if(oracle.includes(lower(name)))actual.add(c);
+    }
+    for(const color of colors)if(actual.has(color))sources[color]++;
+  }
+  const total=Math.max(1,Object.values(demand).reduce((a,b)=>a+b,0));
+  const targets=Object.fromEntries(colors.map(c=>[c,
+    Math.max(4,lands.length*.79*((demand[c]||.5)/total))]));
+  const fractions=colors.map(c=>cap(sources[c]/targets[c]));
+  const score=colors.length?fractions.reduce((a,b)=>a+b,0)/colors.length:1;
+  return {colors,demand,sources,targets,score:Number(score.toFixed(3)),
+    warnings:colors.filter(c=>sources[c]<targets[c]*.75).map(c=>
+      c+': approximately '+sources[c]+' mana sources for '+demand[c].toFixed(1)+' colored symbols; target ~'+Math.ceil(targets[c])+' sources.')};
+}
+
 function scoreCore(cards,commander,context){
   const spells=cards.filter(c=>!isLand(c));
   const lands=cards.filter(isLand);
@@ -91,7 +137,10 @@ function scoreCore(cards,commander,context){
     roles[key]=counts[key];
   }
   const engine=20*coh.score/100;
-  const landPoints=10*cap(1-Math.abs(lands.length-37)/12);
+  const mana=manaBalance(cards,commander);
+  const countPoints=7*cap(1-Math.abs(lands.length-37)/12);
+  const colorPoints=5*mana.score;
+  const landPoints=countPoints+colorPoints;
   const curvePoints=6*cap(1-Math.abs(avg-3.0)/2.3);
   const commanderPoints=commanderFit(commander,cards,context.plan,context.tribes);
   // Gentle pressure to avoid decks with lots of totally disconnected cards
@@ -99,14 +148,14 @@ function scoreCore(cards,commander,context){
   const strayPenalty=(context.plan||context.tribes.length)?Math.max(0,(spells.length*.28-connected))*.22:0;
   const score=cap(Object.values(rawParts).reduce((a,b)=>a+b,0)+engine+
     landPoints+curvePoints+commanderPoints-strayPenalty,0,100);
-  const warnings=[...coh.warnings];
+  const warnings=[...coh.warnings,...mana.warnings];
   if(lands.length<34||lands.length>40)warnings.push(lands.length+' lands: recommended starting point is around 37, adjusted for your build.');
   if(counts.ramp<7)warnings.push('Low ramp density ('+counts.ramp+').');
   if(counts.draw<7)warnings.push('Low card-advantage density ('+counts.draw+').');
   if(counts.removal<5)warnings.push('Few spot interactions ('+counts.removal+').');
   if(avg>4)warnings.push('High average nonland mana value ('+avg.toFixed(2)+').');
   return {score:Number(score.toFixed(2)),lands:lands.length,average_cmc:Number(avg.toFixed(2)),
-    roles,cohesion:coh,commander_fit:commanderPoints,connected,warnings,
+    roles,cohesion:coh,commander_fit:commanderPoints,connected,warnings,mana_balance:mana,
     breakdown:{roles:Number(Object.values(rawParts).reduce((a,b)=>a+b,0).toFixed(1)),
       engine:Number(engine.toFixed(1)),mana_base:Number(landPoints.toFixed(1)),
       mana_curve:Number(curvePoints.toFixed(1)),commander:commanderPoints}};
@@ -155,16 +204,27 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,
       const roleSurplus=r!=='land' && r!=='synergy' ? Math.max(0,(state.roles[r]||0)-(NEED[r]||0)):0;
       const support=synergyFeatures(c,ctx.plan,ctx.tribes,leader).score;
       const isExcessLand=isLand(c)&&state.lands>38;
+      const weakLand=isLand(c)&&state.mana_balance.score<.98;
+      const missingLands=state.lands<36;
       return {c,i,weakness:isExcessLand?90:
-        isLand(c)?-100:roleSurplus*3+(r==='synergy'?12:0)-support*.6+
+        isLand(c)?(weakLand?20:-100):roleSurplus*3+(r==='synergy'?12:0)-support*.6+
+        (missingLands?15:0)+
         Math.max(0,c.cmc-5)*.5};
     }).sort((a,b)=>b.weakness-a.weakness).slice(0,36);
-    const poolAvailable=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c))).slice(0,90);
+    const available=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c)));
+    const poolAvailable=[
+      ...available.filter(isLand).slice(0,38),
+      ...available.filter(c=>!isLand(c)).slice(0,62)
+    ];
     for(const {c:old,i} of positions){
       const oldRole=role(old);
       for(const c of poolAvailable){
-        if(norm(old)===norm(c)||isLand(c)!==isLand(old)&&Math.abs(state.lands-37)<2)continue;
-        if(isLand(old)&&isLand(c)&&Math.abs(state.lands-37)<2)continue;
+        if(norm(old)===norm(c))continue;
+        if(isLand(old)!==isLand(c)){
+          if(isLand(old)&&state.lands<=37)continue;
+          if(isLand(c)&&state.lands>=37)continue;
+        }
+        if(isLand(old)&&isLand(c)&&state.mana_balance.score>=.995)continue;
         // Avoid replacing required basics or dismantling working role engines for tiny gains.
         selected[i]=c;
         const next=scoreCore(selected,leader,ctx);
@@ -185,7 +245,12 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,
     if(!duplicateAllowed(best.old))taken.delete(norm(best.old));
     if(!duplicateAllowed(best.added))taken.add(norm(best.added));
     swaps.push({out:best.old.name,in:best.added.name,gain:Number(best.gain.toFixed(2)),
-      before:state.score,after:best.next.score,reason:ROLE_NAMES[role(best.added)]||'Deck structure'});
+      before:state.score,after:best.next.score,reason:
+      isLand(best.old)&&isLand(best.added)?'Mana-color balancing':
+      isLand(best.old)||isLand(best.added)?'Land count correction':
+      ROLE_NAMES[role(best.added)]||'Deck structure',
+      outCard:{name:best.old.name,image:best.old.image||'',url:best.old.url||''},
+      inCard:{name:best.added.name,image:best.added.image||'',url:best.added.url||''}});
     state=best.next;
   }
   checkDeck(selected,leader);
@@ -254,8 +319,15 @@ export class DeckDoctor {
       progress('Finding legal upgrades for '+(context.plan||context.tribes.join('/')||'the current strategy')+'…');
       pool.push(...await this.source.search(q,90));
     }
+    // Search mana-base candidates even when the count is correct: color access
+    // can be bad in a two/three-color deck with exactly 37 lands.
+    const mana=manaBalance(cards,commander);
     const lands=cards.filter(isLand).length;
-    if(lands<35)pool.push(...await this.source.search(filter+' t:land -t:basic',80));
+    if(lands<37 || mana.score<.99)
+      pool.push(...await this.source.search(filter+' t:land -t:basic',90));
+    const basicNames={W:'Plains',U:'Island',B:'Swamp',R:'Mountain',G:'Forest'};
+    const neededBasics=mana.colors.map(c=>basicNames[c]);
+    if(neededBasics.length)pool.push(...await this.source.collection(neededBasics));
     // Existing role seeds from Scryfall card collection can be reused as fallback.
     pool.push(...await this.source.collection(['Sol Ring','Arcane Signet','Swords to Plowshares',
       'Beast Within','Chaos Warp','Cultivate','Kodama\'s Reach','Counterspell',
@@ -270,7 +342,7 @@ export class DeckDoctor {
         (role(b)!=='synergy'?4:0)-Math.max(0,b.cmc-avg)*.3;
       return bb-aa;
     });
-    return result.slice(0,120);
+    return [...result.filter(isLand).slice(0,42),...result.filter(c=>!isLand(c)).slice(0,100)];
   }
   async alternativeCommander(cards,commander,context,currentScore,progress=()=>{},threshold=15){
     const plan=context.plan;
