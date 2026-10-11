@@ -15,6 +15,16 @@ export function hasAbility(card,keyword){
   return (card.keywords||[]).some(k=>lower(k)===key)||new RegExp('(^|[\\n, ])'+key+'(?=$|[,\\n.])','i').test(text);
 }
 export function supportInfo(card){
+  // No guessing for alternate faces or unsupported variable/phyrexian/hybrid mana.
+  const cardType=String(card.type||card.type_line||'');
+  const mana=String(card.mana_cost||'');
+  if(cardType.includes(' // ') || mana.includes(' // '))
+    return {supported:false,kind:'unsupported',reason:'Modal, split, transform and adventure faces need specialized rules'};
+  if(!isLand(card)) {
+    const symbols=[...mana.matchAll(/\{([^}]+)\}/g)].map(m=>m[1]);
+    if((Number(card.cmc)>0 && !symbols.length) || symbols.some(x=>!/^\d+$|^[WUBRGC]$/.test(x)))
+      return {supported:false,kind:'unsupported',reason:'The mana cost uses an unsupported payment mechanic'};
+  }
   const text=lower(card.oracle_text).replace(/\r/g,'').trim().replace(/\.+$/,'');
   if(isLand(card)) {
     const basic=/\bBasic\b/.test(String(card.type||card.type_line));
