@@ -160,7 +160,7 @@ test('land shortage warnings and optimizer target align on the same rating',()=>
   const repaired=improveCards(list,commander,[forest],{maxSwaps:20});
   assert.ok(repaired.after.lands>30,'Land-short decks should get real spell→land recommendations');
   assert.ok(repaired.after.lands<=repaired.after.land_target);
-  assert.ok(repaired.swaps.every(s=>s.reason==='Fix land count'));
+  assert.ok(repaired.swaps.every(s=>s.reason==='Land count correction'));
   assert.ok(repaired.after.score>rated.score);
 });
 test('responsive Deck Doctor optimize yields progress during extensive tuning',async()=>{
