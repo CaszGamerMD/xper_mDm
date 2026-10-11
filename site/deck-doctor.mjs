@@ -56,10 +56,10 @@ export function inferPlan(cards,commander){
   }).filter(x=>x.enablers>=3&&x.payoffs>=2).sort((a,b)=>b.score-a.score);
   return ranking[0]?.plan || commanderPreference || null;
 }
-function commanderFit(commander,cards,plan,tribes){
+function commanderFit(commander,cards,plan,tribes,context=null){
   const oracle=lower(commander.oracle_text);
   const total=cards.filter(c=>!isLand(c)).length;
-  const matched=cards.filter(c=>!isLand(c) && synergyFeatures(c,plan,tribes,commander).coherent).length;
+  const matched=cards.filter(c=>!isLand(c) && (context?factsFor(c,commander,context):synergyFeatures(c,plan,tribes,commander)).coherent).length;
   let score=0;
   for(const tribe of tribes){
     const re=new RegExp('\\b'+tribe.toLowerCase()+'s?\\b','i');
@@ -122,44 +122,91 @@ export function manaBalance(cards,commander){
       c+': approximately '+sources[c]+' mana sources for '+demand[c].toFixed(1)+' colored symbols; target ~'+Math.ceil(targets[c])+' sources.')};
 }
 
+
+/** Cache immutable Oracle-text feature classification throughout a diagnosis.
+ * The former search ran dozens of regex checks three times per card for
+ * thousands of trial decks, blocking the browser on 20-swap requests.
+ */
+function factsFor(c,commander,context){
+  if(!context._facts)context._facts=new Map();
+  const key=norm(commander)+'|'+norm(c);
+  if(!context._facts.has(key))
+    context._facts.set(key,synergyFeatures(c,context.plan,context.tribes,commander));
+  return context._facts.get(key);
+}
+function roleFor(c,context){
+  if(!context._roles)context._roles=new Map();
+  const key=norm(c);
+  if(!context._roles.has(key))context._roles.set(key,role(c));
+  return context._roles.get(key);
+}
+function targetLandCount(avg,ramps){
+  // Broad baseline only. Dedicated low-land engines and fast mana are not
+  // fully understood: use conservative guidance instead of declaring invalid.
+  return Math.round(cap(37+(avg-3)*.85-Math.max(0,ramps-10)*.19,35,39));
+}
 function scoreCore(cards,commander,context){
   const spells=cards.filter(c=>!isLand(c));
   const lands=cards.filter(isLand);
+  const facts=spells.map(c=>factsFor(c,commander,context));
   const counts=Object.fromEntries([...SPREAD,'synergy'].map(r=>[r,0]));
-  for(const c of spells)counts[role(c)]++;
-  const coh=cohesionReport(spells,context.plan,context.tribes,commander);
+  for(const c of spells)counts[roleFor(c,context)]++;
+  const enablers=facts.filter(f=>f.enabler||f.tribe).length;
+  const payoffs=facts.filter(f=>f.payoff).length;
+  const connected=facts.filter(f=>f.coherent).length;
+  const intentional=Boolean(context.plan||context.tribes.length);
+  const cohesionScore=intentional?
+    Math.round(Math.min(100,35*Math.min(enablers/14,1)+
+    35*Math.min(payoffs/9,1)+
+    30*Math.min(connected/(spells.length*.52),1))):0;
+  const cohWarnings=[];
+  if(intentional&&enablers<9)cohWarnings.push('Engine lacks enough enablers ('+enablers+'); the plan may not start consistently.');
+  if(intentional&&payoffs<5)cohWarnings.push('Engine has only '+payoffs+' clear payoffs; it may generate value without a win condition.');
+  if(intentional&&connected<Math.ceil(spells.length*.35))
+    cohWarnings.push('Only '+connected+' of '+spells.length+' nonland cards clearly connect to the game plan.');
+  const coh={planKey:context.plan||(context.tribes.length?'tribal':null),
+    plan:PLANS[context.plan]?.label||(context.tribes[0]?context.tribes.join('/')+' tribal':'General value'),
+    enablers,payoffs,connected,score:cohesionScore,warnings:cohWarnings};
   const avg=averageSpellManaValue(spells);
   const rawParts={};
   const roles={};
   for(const key of SPREAD){
-    const value=WEIGHTS[key]*neededCount(counts[key],NEED[key]);
-    rawParts[key]=value;
+    rawParts[key]=WEIGHTS[key]*neededCount(counts[key],NEED[key]);
     roles[key]=counts[key];
   }
   const engine=20*coh.score/100;
   const mana=manaBalance(cards,commander);
-  const countPoints=9*cap(1-Math.abs(lands.length-37)/11);
+  const landTarget=targetLandCount(avg,counts.ramp);
+  const countPoints=11*cap(1-Math.abs(lands.length-landTarget)/10);
   const colorPoints=5*mana.score;
   const landPoints=countPoints+colorPoints;
+  // Previous model warned about 31-33 lands but granted less than one point
+  // to fixing each land, often preferring generic draw/removal instead.
+  const deficit=Math.max(0,landTarget-lands.length);
+  const landPenalty=Number((Math.pow(deficit,1.45)*1.8).toFixed(2));
   const curvePoints=6*cap(1-Math.abs(avg-3.0)/2.3);
-  const commanderPoints=commanderFit(commander,cards,context.plan,context.tribes);
-  // Gentle pressure to avoid decks with lots of totally disconnected cards
-  const connected=spells.filter(c=>synergyFeatures(c,context.plan,context.tribes,commander).coherent).length;
-  const strayPenalty=(context.plan||context.tribes.length)?Math.max(0,(spells.length*.28-connected))*.22:0;
+  // Commander fit uses cached spell features; the leader-only text bonus is
+  // still evaluated for alternate commander searches.
+  const commanderPoints=commanderFit(commander,cards,context.plan,context.tribes,context);
+  const strayPenalty=intentional?Math.max(0,spells.length*.28-connected)*.22:0;
   const score=cap(Object.values(rawParts).reduce((a,b)=>a+b,0)+engine+
-    landPoints+curvePoints+commanderPoints-strayPenalty,0,100);
+    landPoints+curvePoints+commanderPoints-strayPenalty-landPenalty,0,100);
   const warnings=[...coh.warnings,...mana.warnings];
-  if(lands.length<34||lands.length>40)warnings.push(lands.length+' lands: recommended starting point is around 37, adjusted for your build.');
+  if(lands.length<landTarget)warnings.push(lands.length+' lands: estimated target '+landTarget+' for this curve/ramp. Add '+(landTarget-lands.length)+' land(s), unless the deck has a proven low-land engine.');
+  if(lands.length>landTarget+2)warnings.push(lands.length+' lands: estimated target '+landTarget+'. Check if the extra lands are necessary.');
   if(counts.ramp<7)warnings.push('Low ramp density ('+counts.ramp+').');
   if(counts.draw<7)warnings.push('Low card-advantage density ('+counts.draw+').');
   if(counts.removal<5)warnings.push('Few spot interactions ('+counts.removal+').');
   if(avg>4)warnings.push('High average nonland mana value ('+avg.toFixed(2)+').');
-  return {score:Number(score.toFixed(2)),lands:lands.length,average_cmc:Number(avg.toFixed(2)),
-    roles,cohesion:coh,commander_fit:commanderPoints,connected,warnings,mana_balance:mana,
+  return {score:Number(score.toFixed(2)),lands:lands.length,land_target:landTarget,
+    average_cmc:Number(avg.toFixed(2)),roles,cohesion:coh,
+    commander_fit:commanderPoints,connected,warnings,mana_balance:mana,
     breakdown:{roles:Number(Object.values(rawParts).reduce((a,b)=>a+b,0).toFixed(1)),
       engine:Number(engine.toFixed(1)),mana_base:Number(landPoints.toFixed(1)),
+      land_penalty:-landPenalty,
       mana_curve:Number(curvePoints.toFixed(1)),commander:commanderPoints}};
 }
+
 export function rateDeck(cards,commander,context=null){
   const source=cards.map(coerce);
   const leader=coerce(commander);
@@ -179,7 +226,11 @@ function checkDeck(cards,commander){
     seen.set(key,previous+1);
   }
 }
-export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,context=null}={}){
+/** Only propose swaps with a stated structural gain. Missing land counts
+ * receive their own short candidate search instead of being crowded out by
+ * hundreds of role-only suggestions. Hard limit evaluations per iteration.
+ */
+export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGain=.65,context=null,onProgress=null}={}){
   if(!Number.isInteger(maxSwaps)||maxSwaps<0||maxSwaps>20)
     throw new DeckInputError('Maximum suggested swaps must be between 0 and 20.');
   const leader=coerce(commander),original=cards.map(coerce);
@@ -188,74 +239,150 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,
   const initial=rateDeck(original,leader,ctx);
   const selected=original.slice(),taken=new Set(selected.filter(c=>!duplicateAllowed(c)).map(norm));
   taken.add(norm(leader));
-  const pool=candidates.map(coerce).filter(c=>c.eligible && withinIdentity(c,leader) && norm(c)!==norm(leader));
-  const swaps=[];
-  let state=initial;
-  // Optimize with the *same* objective and context each iteration (never shift
-  // strategic goals to manufacture a score increase).
+  const pool=[...new Map(candidates.map(coerce)
+    .filter(c=>c.eligible && withinIdentity(c,leader) && norm(c)!==norm(leader))
+    .map(c=>[norm(c),c])).values()];
+  const swaps=[],usedPositions=new Set(),removedNames=new Set();
+  let state=initial,totalEvaluations=0;
+  const structural=card=>{
+    const f=factsFor(card,leader,ctx);
+    return f.score+(f.enabler?3:0)+(f.payoff?4:0)+(f.leaderSupport?2:0);
+  };
   for(let step=0;step<maxSwaps;step++){
-    let best=null;
-    // Evaluate a few strategically weak slots first, but permit changes anywhere.
-    // Basic lands can be replaced to correct land counts.
-    // Bound browser CPU work: prioritize replaceable, disconnected cards and
-    // surplus roles, leaving already-connected engine pieces intact where possible.
-    const positions=selected.map((c,i)=>{
-      const r=role(c);
-      const roleSurplus=r!=='land' && r!=='synergy' ? Math.max(0,(state.roles[r]||0)-(NEED[r]||0)):0;
-      const support=synergyFeatures(c,ctx.plan,ctx.tribes,leader).score;
-      const isExcessLand=isLand(c)&&state.lands>38;
-      const weakLand=isLand(c)&&state.mana_balance.score<.98;
-      const missingLands=state.lands<36;
-      return {c,i,weakness:isExcessLand?90:
-        isLand(c)?(weakLand?20:-100):roleSurplus*3+(r==='synergy'?12:0)-support*.6+
-        (missingLands?15:0)+
-        Math.max(0,c.cmc-5)*.5};
-    }).sort((a,b)=>b.weakness-a.weakness).slice(0,36);
+    const shortage=state.lands<state.land_target;
+    const needsColor=state.mana_balance.score<.995;
+    const excess=state.lands>state.land_target+3 && !needsColor;
+    // A missing land gets first attention even if the deck has lots of
+    // spells competing for higher role/engine points.
     const available=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c)));
-    const poolAvailable=[
-      ...available.filter(isLand).slice(0,38),
-      ...available.filter(c=>!isLand(c)).slice(0,62)
-    ];
-    for(const {c:old,i} of positions){
-      const oldRole=role(old);
-      for(const c of poolAvailable){
-        if(norm(old)===norm(c))continue;
-        if(isLand(old)!==isLand(c)){
-          if(isLand(old)&&state.lands<=37)continue;
-          if(isLand(c)&&state.lands>=37)continue;
+    const landOptions=available.filter(isLand).sort((a,b)=>{
+      const quality=c=>state.mana_balance.colors.reduce((sum,color)=>
+        sum+(((c.produced_mana||[]).includes(color)||
+          new RegExp('\\b'+({W:'Plains',U:'Island',B:'Swamp',R:'Mountain',G:'Forest'}[color])+'\\b').test(c.type_line))?
+            Math.max(0,1-state.mana_balance.sources[color]/Math.max(1,state.mana_balance.targets[color])):0),0);
+      return quality(b)-quality(a);
+    }).slice(0,10);
+    const spellOptions=available.filter(c=>!isLand(c)).sort((a,b)=>{
+      const val=c=>structural(c)*1.8+
+        ((roleFor(c,ctx)!=='synergy'&&state.roles[roleFor(c,ctx)]<(NEED[roleFor(c,ctx)]||0))?9:0)
+        -Math.max(0,c.cmc-5);
+      return val(b)-val(a);
+    }).slice(0,22);
+    const positions=selected.map((c,i)=>{
+      const r=roleFor(c,ctx),f=factsFor(c,leader,ctx);
+      const surplus=r!=='land'&&r!=='synergy'?Math.max(0,state.roles[r]-(NEED[r]||0)):0;
+      const availableColors=isLand(c)?state.mana_balance.colors.filter(color=>
+        (c.produced_mana||[]).includes(color) ||
+        new RegExp('\\b'+({W:'Plains',U:'Island',B:'Swamp',R:'Mountain',G:'Forest'}[color])+'\\b').test(c.type_line||'') ||
+        /add (?:one|two|three) mana of any (?:one )?color/i.test(c.oracle_text||'')
+      ).length:0;
+      return {c,i,weakness:isLand(c)?
+        (excess?120:needsColor?40-12*availableColors:-200):
+        (shortage?50:0)+surplus*5-structural(c)*.85+
+        Math.max(0,c.cmc-5)*.6+(r==='synergy'?7:0),
+        protectedEngine:f.enabler||f.payoff};
+    }).filter(p=>!usedPositions.has(p.i))
+      .sort((a,b)=>b.weakness-a.weakness);
+    const fromPositions=shortage?positions.filter(p=>!isLand(p.c)).slice(0,14):
+      excess?positions.filter(p=>isLand(p.c)).slice(0,12):
+      [...positions.filter(p=>!isLand(p.c)).slice(0,15),
+        ...positions.filter(p=>isLand(p.c)).slice(0,9)];
+    let best=null;
+    for(const {c:old,i,protectedEngine} of fromPositions){
+      const oldRole=roleFor(old,ctx);
+      const options=shortage?landOptions:excess?spellOptions:
+        isLand(old)?landOptions:spellOptions;
+      for(const nextCard of options){
+        if(norm(old)===norm(nextCard)||removedNames.has(norm(nextCard)))continue;
+        const oldLand=isLand(old),newLand=isLand(nextCard);
+        if(shortage && (oldLand||!newLand))continue;
+        if(excess && (!oldLand||newLand))continue;
+        if(!shortage&&!excess && oldLand!==newLand)continue;
+        if(oldLand&&newLand&&!needsColor)continue;
+        if(!oldLand&&!newLand){
+          // Never discard an existing trigger, engine enabler or payoff for
+          // a generic off-theme staple. A role deficit alone is not proof.
+          const before=factsFor(old,leader,ctx),after=factsFor(nextCard,leader,ctx);
+          if(protectedEngine && structural(nextCard)<structural(old))continue;
+          if(oldRole===roleFor(nextCard,ctx) && after.score<=before.score)continue;
         }
-        if(isLand(old)&&isLand(c)&&state.mana_balance.score>=.995)continue;
-        // Avoid replacing required basics or dismantling working role engines for tiny gains.
-        selected[i]=c;
-        const next=scoreCore(selected,leader,ctx);
+        if((oldRole==='ramp'||oldRole==='draw'||oldRole==='removal')&&
+          state.roles[oldRole]<(NEED[oldRole]||0)&&oldRole!==roleFor(nextCard,ctx)&&!newLand)continue;
+        selected[i]=nextCard;
+        const result=scoreCore(selected,leader,ctx);
         selected[i]=old;
-        const gain=next.score-state.score;
-        if(gain<(isLand(old)&&isLand(c)?.08:minGain))continue;
-        // A role-preserving swap is preferred in close ties, and one cannot
-        // change the same position repeatedly without improving the score.
-        const preference=(role(c)===oldRole?.12:0)+(isLand(c)===isLand(old)?.06:0);
-        if(!best || gain>best.gain+.015 ||
-          (Math.abs(gain-best.gain)<=.015 && preference>best.preference)){
-          best={i,old,added:c,next,gain,preference};
-        }
+        totalEvaluations++;
+        const gain=result.score-state.score;
+        const confidence=oldLand!==newLand?'Land count':
+          oldLand?'Mana source':
+          'Role/synergy';
+        const improvesLands=newLand&&!oldLand&&result.lands>state.lands;
+        const improvesColors=oldLand&&newLand&&result.mana_balance.score>state.mana_balance.score;
+        const improvesRole=!oldLand&&!newLand&&
+          (result.cohesion.score>state.cohesion.score ||
+           Object.keys(NEED).some(r=>state.roles[r]<NEED[r]&&result.roles[r]>state.roles[r]));
+        if(!improvesLands&&!improvesColors&&!improvesRole)continue;
+        const neededGain=oldLand&&newLand?.07:shortage?.10:minGain;
+        if(gain<neededGain)continue;
+        // Bias toward less disruption, not maximizing generic role counters.
+        const preference=protectedEngine?-1:0;
+        if(!best||gain>best.gain+.03||(Math.abs(gain-best.gain)<=.03&&preference>best.preference))
+          best={i,old,added:nextCard,next:result,gain,preference,confidence};
       }
     }
     if(!best)break;
     selected[best.i]=best.added;
+    usedPositions.add(best.i);
+    removedNames.add(norm(best.old));
     if(!duplicateAllowed(best.old))taken.delete(norm(best.old));
     if(!duplicateAllowed(best.added))taken.add(norm(best.added));
-    swaps.push({out:best.old.name,in:best.added.name,gain:Number(best.gain.toFixed(2)),
-      before:state.score,after:best.next.score,reason:
-      isLand(best.old)&&isLand(best.added)?'Mana-color balancing':
-      isLand(best.old)||isLand(best.added)?'Land count correction':
-      ROLE_NAMES[role(best.added)]||'Deck structure',
+    const oldReport=state,newReport=best.next;
+    const changes=[];
+    if(oldReport.lands!==newReport.lands)changes.push('Lands '+oldReport.lands+' → '+newReport.lands+
+      ' (target '+newReport.land_target+')');
+    for(const c of newReport.mana_balance.colors)
+      if(oldReport.mana_balance.sources[c]!==newReport.mana_balance.sources[c])
+        changes.push(c+' sources '+oldReport.mana_balance.sources[c]+' → '+newReport.mana_balance.sources[c]);
+    for(const r of SPREAD)
+      if(oldReport.roles[r]!==newReport.roles[r])changes.push(ROLE_NAMES[r]+
+        ' '+oldReport.roles[r]+' → '+newReport.roles[r]);
+    if(oldReport.cohesion.score!==newReport.cohesion.score)
+      changes.push('Cohesion '+oldReport.cohesion.score+' → '+newReport.cohesion.score);
+    swaps.push({
+      out:best.old.name,in:best.added.name,gain:Number(best.gain.toFixed(2)),
+      before:state.score,after:best.next.score,
+      reason:best.confidence==='Land count'?'Land count correction':
+        best.confidence==='Mana source'?'Mana-color balancing':
+        'Improve missing role / recognizable synergy',
+      evidence:changes.join(' · '),
       outCard:{name:best.old.name,image:best.old.image||'',url:best.old.url||''},
-      inCard:{name:best.added.name,image:best.added.image||'',url:best.added.url||''}});
+      inCard:{name:best.added.name,image:best.added.image||'',url:best.added.url||''}
+    });
     state=best.next;
+    if(typeof onProgress==='function')onProgress({done:swaps.length,max:maxSwaps,
+      lands:state.lands,target:state.land_target});
+    yield {done:swaps.length,max:maxSwaps,lands:state.lands,target:state.land_target};
   }
   checkDeck(selected,leader);
   return {cards:selected,commander:leader,before:initial,after:state,swaps,
-    context:ctx,remaining:99-swaps.length};
+    context:ctx,remaining:99-swaps.length,evaluations:totalEvaluations};
+}
+
+export function improveCards(cards,commander,candidates,options={}){
+  const steps=improveCardsSteps(cards,commander,candidates,options);
+  let item=steps.next();
+  while(!item.done)item=steps.next();
+  return item.value;
+}
+async function improveCardsResponsive(cards,commander,candidates,options={}){
+  const steps=improveCardsSteps(cards,commander,candidates,options);
+  let item=steps.next();
+  while(!item.done){
+    // Let the browser paint progress and remain responsive even with 20 swaps.
+    await new Promise(resolve=>setTimeout(resolve,0));
+    item=steps.next();
+  }
+  return item.value;
 }
 function viewCard(c,quantity=1){
   return {name:c.name,quantity,cmc:c.cmc,type:c.type_line,oracle_text:c.oracle_text,
@@ -379,7 +506,11 @@ export class DeckDoctor {
     const original=rateDeck(loaded.cards,loaded.commander,context);
     progress('Evaluating structure, roles, cohesion, mana curve and minimal-change upgrades…');
     const pool=maxSwaps?await this.candidatePool(loaded.cards,loaded.commander,context,progress):[];
-    const tuned=improveCards(loaded.cards,loaded.commander,pool,{maxSwaps,context});
+    const tuned=await improveCardsResponsive(loaded.cards,loaded.commander,pool,{
+      maxSwaps,context,
+      onProgress:p=>progress('Checking verified swaps '+p.done+'/'+p.max+
+        ' · '+p.lands+' lands (target '+p.target+')…')
+    });
     let suggestion=null;
     if(considerCommander) {
       // The threshold is deliberately high: a commander change only qualifies

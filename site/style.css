@@ -222,3 +222,8 @@
   .play-deck-previews{grid-template-columns:1fr}
   .doctor-swap-art{width:clamp(75px,23vw,115px)}
 }
+
+.doctor-confidence-note{border-left:3px solid #d2ad77;background:#4d392529;padding:11px 14px;font-size:12px;line-height:1.7;color:#ead7b8;border-radius:5px}
+.doctor-land-remaining{border-left:3px solid #d99785;background:#502a292f;padding:11px 14px;font-size:12px;line-height:1.7;color:#ffcebe;border-radius:5px}
+.doctor-why strong{display:block;font-size:12px}
+.doctor-why small{display:block;font-size:11px;line-height:1.5;color:var(--muted);margin-top:6px}

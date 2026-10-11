@@ -69,14 +69,14 @@ export function mountDeckDoctor({saveDeck,openDeck}){
     const section=elem('div','doctor-score-card');
     section.append(elem('h3','',kind));
     const row=elem('div','metrics');
-    for(const [name,num] of [['Score / 100',fmt(metrics.score)],['Lands',metrics.lands],
+    for(const [name,num] of [['Estimated / 100',fmt(metrics.score)],['Lands',metrics.lands+' / '+(metrics.land_target||37)],
       ['Avg nonland MV',fmt(metrics.average_cmc)],['Connected cards',metrics.connected],
       ['Commander fit',metrics.commander_fit+'/20']])
       row.append(metric(name,num));
     section.append(row);
     const chart=elem('div','doctor-breakdown');
     for(const [key,name] of [['roles','Roles'],['engine','Engine cohesion'],['mana_base','Mana base'],
-      ['mana_curve','Mana curve'],['commander','Commander fit']]){
+      ['land_penalty','Short-land penalty'],['mana_curve','Mana curve'],['commander','Commander fit']]){
       chart.append(elem('span','',name),elem('strong','',fmt(metrics.breakdown[key])));
     }
     section.append(chart);
@@ -124,20 +124,31 @@ export function mountDeckDoctor({saveDeck,openDeck}){
     results.append(top);
     const gained=Number((result.upgraded.score-result.original.score).toFixed(2));
     results.append(elem('p','doctor-highlight',
-      result.swaps.length+' spell/land swap(s), '+result.keptCount+' of 99 original cards retained. '+
+      result.swaps.length+' evidence-gated suggestion(s), '+result.keptCount+' of 99 original cards retained. '+
       'Score '+fmt(result.original.score)+' → '+fmt(result.upgraded.score)+
       ' ('+(gained>=0?'+':'')+fmt(gained)+'). Commander preserved: '+result.originalCommander+'.'));
     const info=elem('p','hint','Detected core: '+(result.context.plan||'General value')+
       (result.context.tribes.length?' · '+result.context.tribes.join('/')+' tribal':'')+
       '. The optimization keeps this strategy fixed so an apparent score gain cannot come from changing the evaluation criteria.');
     results.append(info);
+    if(result.upgraded.lands<result.upgraded.land_target){
+      results.append(elem('p','doctor-land-remaining',
+        'Still under the estimated land target: '+result.upgraded.lands+' / '+result.upgraded.land_target+
+        '. The optimizer did not find another legal, low-disruption land swap that improved its structural rating. '+
+        'This does NOT mean the current mana base is optimal. Manually review the remaining land shortfall.'));
+    }
+    results.append(elem('p','doctor-confidence-note',
+      'Recommendations are hypotheses about structural improvements, NOT verified upgrades or demonstrated win-rate gains. '+
+      'Existing recognized engine enablers and payoffs are protected from unrelated substitutions. '+
+      'Land-count repairs are prioritized. Maximum changes is a ceiling, not a swap quota. '+
+      'Inspect the exact before/after evidence for each proposed change before saving.'));
     const table=elem('table','doctor-swap-table');
     const head=elem('thead');const header=elem('tr');
     for(const title of ['Remove','Add','Reason','Estimated gain'])header.append(elem('th','',title));
     head.append(header);table.append(head);
     const body=elem('tbody');
     if(result.swaps.length===0){
-      const row=elem('tr'),cell=elem('td','','No swaps met the minimum improvement threshold within the chosen limit.');
+      const row=elem('tr'),cell=elem('td','','No supported change passed the conservative score-and-evidence checks. Your original deck is preserved.');
       cell.colSpan=4;row.append(cell);body.append(row);
     }else for(const swap of result.swaps){
       const row=elem('tr');
@@ -152,7 +163,10 @@ export function mountDeckDoctor({saveDeck,openDeck}){
         if(card.url){link.href=card.url;link.target='_blank';link.rel='noopener noreferrer';}
         tile.append(link);td.append(tile);row.append(td);
       }
-      row.append(elem('td','',swap.reason),elem('td','','+'+fmt(swap.gain)));
+      const reason=elem('td','doctor-why');
+      reason.append(elem('strong','',swap.reason));
+      reason.append(elem('small','',swap.evidence||'No additional role evidence available'));
+      row.append(reason,elem('td','','+'+fmt(swap.gain)));
       body.append(row);
     }
     table.append(body);results.append(elem('h3','','Proposed card-for-card swaps'),table);
