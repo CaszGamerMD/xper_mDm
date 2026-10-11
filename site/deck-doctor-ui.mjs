@@ -131,6 +131,12 @@ export function mountDeckDoctor({saveDeck,openDeck}){
       (result.context.tribes.length?' · '+result.context.tribes.join('/')+' tribal':'')+
       '. The optimization keeps this strategy fixed so an apparent score gain cannot come from changing the evaluation criteria.');
     results.append(info);
+    if(result.upgraded.lands<result.upgraded.land_target){
+      results.append(elem('p','doctor-land-remaining',
+        'Still under the estimated land target: '+result.upgraded.lands+' / '+result.upgraded.land_target+
+        '. The optimizer did not find another legal, low-disruption land swap that improved its structural rating. '+
+        'This does NOT mean the current mana base is optimal. Manually review the remaining land shortfall.'));
+    }
     results.append(elem('p','doctor-confidence-note',
       'Recommendations are hypotheses about structural improvements, NOT verified upgrades or demonstrated win-rate gains. '+
       'Existing recognized engine enablers and payoffs are protected from unrelated substitutions. '+
