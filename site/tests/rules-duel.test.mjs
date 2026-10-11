@@ -151,3 +151,55 @@ test('Rules Lab exposes coverage and detailed stack state to the UI',()=>{
   d.cast(d.players[0].hand.length-1);
   assert.equal(d.view().stack[0].name,'Draw Now');
 });
+
+
+test('modal and variable-mana Oracle cards are explicitly unsupported',()=>{
+  const variable=card('Big X Spell','Sorcery',1,'{X}{U}','Draw two cards.');
+  const hybrid=card('Hybrid Spell','Instant',2,'{U/R}{U/R}','Draw a card.');
+  const modal=card('Front // Back','Instant // Land',1,'{U} // ','Draw a card.');
+  for(const c of [variable,hybrid,modal])assert.equal(supportInfo(c).supported,false);
+});
+test('counter-counter stack chain correctly restores the original spell',()=>{
+  const d=setup();land(d,0,island,5);land(d,1,island,2);
+  d.players[0].hand.push(draw2,counter);
+  d.players[1].hand.push(counter);
+  d.cast(d.players[0].hand.findIndex(c=>c.name==='Divination'));
+  d.passPriority(); // AI counters our draw spell
+  assert.equal(d.stack.length,2);
+  const counterIndex=d.players[0].hand.findIndex(c=>c.name==='Counterspell');
+  d.cast(counterIndex,d.stack.at(-1).id);
+  assert.equal(d.stack.length,3);
+  d.passPriority();
+  assert.equal(d.stack.length,1); // our Counterspell countered the AI Counterspell
+  assert.equal(d.stack[0].card.name,'Divination');
+  d.passPriority();
+  assert.equal(d.stack.length,0);
+  assert.ok(d.players[0].graveyard.some(c=>c.name==='Divination'));
+});
+test('double strike deals damage twice while lifelink gains the same amount',()=>{
+  const d=setup();
+  const attacker=d._addPermanent(0,card('Angel Fighter','Creature — Angel',4,'{2}{W}{W}','Double strike, lifelink','3','4'));
+  attacker.enteredTurn=0;
+  d._resolveCombat(0,[attacker],{});
+  assert.equal(d.players[1].life,34);
+  assert.equal(d.players[0].life,46);
+});
+test('countering a commander returns it to the command zone without increasing tax twice',()=>{
+  const d=setup();land(d,0,forest,2);land(d,1,island,2);
+  d.players[1].hand.push(counter);
+  d.castCommander();
+  assert.equal(d.players[0].commanderTax,2);
+  d.passPriority(); // AI counters
+  d.passPriority(); // Counter resolves
+  assert.equal(d.players[0].commanderInZone,true);
+  assert.equal(d.players[0].commanderTax,2);
+});
+test('post-combat main phase still permits spell casting',()=>{
+  const d=setup();land(d,0,forest,3);
+  d.beginCombat([]);
+  assert.equal(d.view().step,'postcombat');
+  d.players[0].hand.push(bear);
+  d.cast(d.players[0].hand.length-1);
+  d.passPriority();
+  assert.ok(d.players[0].battlefield.some(o=>o.card.name==='Grizzly Bears'));
+});
