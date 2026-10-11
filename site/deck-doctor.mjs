@@ -129,7 +129,7 @@ function checkDeck(cards,commander){
     seen.set(key,previous+1);
   }
 }
-export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=1.25,context=null}={}){
+export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,context=null}={}){
   if(!Number.isInteger(maxSwaps)||maxSwaps<0||maxSwaps>20)
     throw new DeckInputError('Maximum suggested swaps must be between 0 and 20.');
   const leader=coerce(commander),original=cards.map(coerce);
@@ -147,8 +147,18 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=1.25
     let best=null;
     // Evaluate a few strategically weak slots first, but permit changes anywhere.
     // Basic lands can be replaced to correct land counts.
-    const positions=selected.map((c,i)=>({c,i}));
-    const poolAvailable=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c)));
+    // Bound browser CPU work: prioritize replaceable, disconnected cards and
+    // surplus roles, leaving already-connected engine pieces intact where possible.
+    const positions=selected.map((c,i)=>{
+      const r=role(c);
+      const roleSurplus=r!=='land' && r!=='synergy' ? Math.max(0,(state.roles[r]||0)-(NEED[r]||0)):0;
+      const support=synergyFeatures(c,ctx.plan,ctx.tribes,leader).score;
+      const isExcessLand=isLand(c)&&state.lands>38;
+      return {c,i,weakness:isExcessLand?90:
+        isLand(c)?-100:roleSurplus*3+(r==='synergy'?12:0)-support*.6+
+        Math.max(0,c.cmc-5)*.5};
+    }).sort((a,b)=>b.weakness-a.weakness).slice(0,36);
+    const poolAvailable=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c))).slice(0,90);
     for(const {c:old,i} of positions){
       const oldRole=role(old);
       for(const c of poolAvailable){
