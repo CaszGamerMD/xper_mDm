@@ -10,6 +10,15 @@ The main app lives in [`site/`](site/). It generates up to four 100-card Magic: 
 
 
 
+
+### Deck Doctor optimizer reliability (v0.9.1)
+
+The former 20-swap mode could freeze the browser by repeatedly rescoring thousands of card combinations. The revised search caches card features, restricts candidate comparisons to a bounded shortlist and yields to browser rendering between accepted swaps. **Twenty is a maximum, not a target**; it stops rather than manufacturing score-only replacements.
+
+Mana tuning now explicitly penalizes severe land shortfalls, prioritizes adding lands before discretionary spells, and targets weak color-producing lands when fixing color access. The estimated land target depends on mana curve and ramp. If that target cannot be reached using credible one-for-one swaps, the remaining shortfall is disclosed rather than silently ignored.
+
+Conservative substitution rules protect recognizable combo/engine enablers and payoffs, require an identifiable mana, role-density or theme-cohesion benefit, and give measurable before/after reasons for every suggestion. **These do not prove a card is a real gameplay upgrade**: the roles and card-text classifiers are heuristics, and neither a comprehensive Magic rules engine nor observed win rates are used. Review every swap before accepting it, especially in combo-heavy decks.
+
 ## Three pages, mana-base improvements and interactive zone previews (v0.9)
 
 The same browser-only site now has three independent pages accessed by the navigation tabs or URL fragments: **Deck Generator** (#generator), **Deck Doctor** (#doctor), **AI Playtest** (#playtest). Switching pages does not erase the builder, loaded lists or match state. The card-size preference remains available on the generator page and applies throughout the app.
