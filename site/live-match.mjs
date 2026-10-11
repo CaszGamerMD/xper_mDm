@@ -9,7 +9,6 @@
  */
 import {DeckInputError} from './generator.mjs';
 
-const CARD_TYPES=/(?:^|\s)Land(?:\s|$)/i;
 const lc=value=>String(value||'').toLowerCase();
 const typeOf=card=>String(card.type||card.type_line||'').split(' // ')[0];
 const isLand=card=>/\bLand\b/.test(typeOf(card).split(' — ')[0]);
@@ -41,12 +40,12 @@ function basicColors(card) {
 }
 export function manaSource(card,identity=[]) {
   const text=textOf(card),values=new Set([...(card.produced_mana||[]),...basicColors(card)]);
-  for(const symbol of (text.match(/add (?:[^.]*?)\{[WUBRGC]\}/g)||[]))
-    for(const letter of symbol.match(/\{[WUBRGC]\}/g)||[])values.add(letter[1]);
+  for(const symbol of (text.match(/add (?:[^.]*?)\{[wubrgc]\}/g)||[]))
+    for(const letter of symbol.match(/\{[wubrgc]\}/g)||[])values.add(letter[1].toUpperCase());
   if(/add (?:one|two|three|an amount of) mana of any (?:one )?color/.test(text))
     for(const color of identity)values.add(color);
   if(isLand(card)&&values.size===0)values.add('C');
-  const mult=/add \{C\}\{C\}/.test(text)?2:1;
+  const mult=/add \{c\}\{c\}/.test(text)?2:1;
   return {colors:[...values],amount:mult};
 }
 function costOf(card,tax=0) {
@@ -105,7 +104,7 @@ function toughness(card) {
   const number=parseInt(String(card.toughness||''),10);
   return Number.isFinite(number)?atLeast(number,1,25):Math.max(1,Math.round((Number(card.cmc)||2)*.65));
 }
-function cardStrength(card){return powered(card)+(has(card,'flying')?1.5:0)+(has(card,'trample')?.6:0);}
+function cardStrength(card){return powered(card)+(has(card,'flying')?1.5:0)+(has(card,'trample')?0.6:0);}
 function effectiveColors(card,identity){return manaSource(card,identity);}
 function newPlayer(deck,random){
   const library=shuffle(expandMain(deck),random);
