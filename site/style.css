@@ -107,3 +107,25 @@
 .duel-unsupported{font-size:10px;color:#ffbea9;line-height:1.4}
 
 .duel-unsupported-summary{border-left:3px solid #edaa72;background:#4f322b88;padding:12px;color:#ffe0b9;font-size:12px;line-height:1.6;border-radius:5px}
+
+
+/* Global persistent card-scale preference: gallery, hand, and battlefield cards */
+:root{--card-scale:1}
+.preview-size-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:20px;padding:13px 16px;border:1px solid var(--border);background:#1a232b;border-radius:11px}
+.preview-size-controls label{font-weight:800;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.preview-size-controls label small{font-size:11px;color:var(--muted);font-weight:400}
+.preview-size-controls input[type=range]{accent-color:var(--accent);width:clamp(135px,23vw,260px);flex-shrink:1}
+.preview-size-controls output{font-size:13px;font-weight:800;color:var(--accent);min-width:45px;text-align:right;font-variant-numeric:tabular-nums}
+.clear-builder{display:block;width:100%;margin-top:8px;cursor:pointer;padding:11px 14px}
+.card-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(135px * var(--card-scale))),1fr))}
+.duel-hand-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(128px * var(--card-scale))),1fr))}
+.duel-permanent{width:calc(101px * var(--card-scale))}
+.duel-permanent-art,.duel-permanent-art img{height:calc(125px * var(--card-scale))}
+.duel-bottom-choice{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;font-weight:700;color:var(--gold);padding:6px 3px}
+.duel-bottom-choice input{height:18px;width:18px;accent-color:var(--gold)}
+@media(max-width:560px){
+  .card-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(112px * var(--card-scale))),1fr))}
+  .duel-hand-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(114px * var(--card-scale))),1fr))}
+  .duel-permanent{width:calc(81px * var(--card-scale))}
+  .duel-permanent-art,.duel-permanent-art img{height:calc(103px * var(--card-scale))}
+}

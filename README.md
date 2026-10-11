@@ -7,6 +7,19 @@ The main app lives in [`site/`](site/). It generates up to four 100-card Magic: 
 
 
 
+
+## Builder comfort and opening mulligans (v0.7)
+
+**Start over · clear builder** resets colors, creature types, mechanic choices, the commander, must-have cards, the deck description, target mana value and generated deck results. It does **not** erase the local saved-deck vault or your card display preferences. If a previous generation is still running, its result is ignored so it cannot overwrite the cleared screen.
+
+**Card preview size** slider (90%–180%) scales the deck gallery as well as your hand and battlefield previews in both live modes. The preference is stored in browser localStorage on that device.
+
+**Friendly vs Strict opening mulligans:** Choose the mode above the playtest buttons before starting Live AI or Rules Lab. Both start with a seven-card opening hand.
+- **Friendly:** Take as many mulligans as desired; each reshuffles and draws a fresh seven, with no cards to bottom when keeping.
+- **Strict:** Take successive seven-card mulligans. If you took **X** strict mulligans, on keeping choose exactly **max(0, X − 1)** cards from that seven to put on the bottom of the library; the game cannot begin until the required selection is submitted. This follows the requested first-free-mulligan variant for 1v1 casual Commander. Since an opening hand has seven cards, Strict mode has a maximum of eight mulligans (a zero-card keep). The AI also evaluates and automatically mulligans its own opening hand (up to three attempts) in the selected mode, then bottoms the required number when Strict.
+
+This is a configurable practice variant, not a claim that it reproduces every official multiplayer/duel Commander mulligan convention. Mulligan mode is saved in browser localStorage for future play sessions.
+
 ## Rules Lab milestone (v0.6) — fail-closed gameplay foundations
 
 The new **Rules Lab · strict effects** button starts an independent, experimental implementation alongside the older quick-play simulator. It introduces visible last-in-first-out spell stack resolution, human instant-speed responses, automatic AI counterspell reactions, target checks at casting and resolution, simultaneous creature combat damage, first strike/double strike, lifelink, deathtouch, trample, flying/reach, indestructible, commander tax applied upon casts, and pre/postcombat main-phase windows. It shows supported card percentage **for each deck** and clearly marks unsupported cards instead of pretending their abilities worked.
