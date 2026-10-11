@@ -98,3 +98,10 @@
 .duel-log summary{padding:11px;cursor:pointer;background:#202e39;font-size:12px}
 .duel-log pre{margin:0;padding:14px;font-size:12px;color:var(--muted);max-height:320px;overflow:auto;white-space:pre-wrap;line-height:1.6}
 @media(max-width:560px){.live-game{padding:10px}.duel-field,.duel-hand{padding:10px}.duel-hand-grid{grid-template-columns:repeat(auto-fill,minmax(114px,1fr));gap:9px}.duel-permanent{width:81px}.duel-permanent-art,.duel-permanent-art img{height:103px}}
+
+/* Rules Lab stack and verified-card coverage */
+.duel-coverage{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.duel-coverage span{font-size:12px;color:#c4d8ce;background:#21332f;padding:7px 10px;border:1px solid #39584e;border-radius:7px}
+.duel-stack{margin:13px 0;padding:13px;border:1px solid #ab9259;border-radius:9px;background:#352b1f;display:grid;gap:7px;font-size:12px}
+.duel-stack strong{color:var(--gold);font-size:13px}
+.duel-unsupported{font-size:10px;color:#ffbea9;line-height:1.4}
