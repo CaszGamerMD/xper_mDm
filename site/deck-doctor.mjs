@@ -352,7 +352,7 @@ export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGai
       out:best.old.name,in:best.added.name,gain:Number(best.gain.toFixed(2)),
       before:state.score,after:best.next.score,
       reason:best.confidence==='Land count'?'Land count correction':
-        best.confidence==='Mana source'?'Improve colored mana access':
+        best.confidence==='Mana source'?'Mana-color balancing':
         'Improve missing role / recognizable synergy',
       evidence:changes.join(' · '),
       outCard:{name:best.old.name,image:best.old.image||'',url:best.old.url||''},
