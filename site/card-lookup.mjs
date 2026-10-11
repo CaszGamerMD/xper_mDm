@@ -52,3 +52,14 @@ export async function resolveCardNames(names,source) {
   }
   return byRequest;
 }
+
+/** Named lookup for commander/favorite entries, including a fully written back face. */
+export async function lookupNamedCard(name,source) {
+  const written=String(name||'').trim();
+  const direct=await source.named(written);
+  if(!written.includes('//'))return direct;
+  if(matchesCardName(written,direct))return direct;
+  const front=cardFaceNames(written)[0];
+  const alternate=await source.named(front);
+  return matchesCardName(written,alternate)?alternate:null;
+}
