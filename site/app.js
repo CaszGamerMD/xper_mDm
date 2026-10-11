@@ -4,6 +4,30 @@ import { interpretPrompt } from "./intent.mjs";
 import {DeckLibrary, importDecklist, simulateSeries} from "./playtest.mjs";
 import {mountLiveArena} from "./live-ui.mjs";
 import {mountDeckDoctor} from "./deck-doctor-ui.mjs";
+const PAGES={generator:'page-generator',doctor:'deck-doctor',playtest:'playtest'};
+function showPage(page,{scroll=false}={}){
+  const selected=PAGES[page]?page:'generator';
+  for(const [key,id] of Object.entries(PAGES)){
+    const target=document.getElementById(id);
+    target.hidden=key!==selected;
+  }
+  for(const control of document.querySelectorAll('.site-nav [data-page]')){
+    const active=control.dataset.page===selected;
+    if(active)control.setAttribute('aria-current','page');
+    else control.removeAttribute('aria-current');
+  }
+  if(scroll)window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.site-nav [data-page]').forEach(control=>{
+  control.addEventListener('click',()=>{
+    const next=control.dataset.page;
+    if(location.hash!=='#'+next)location.hash=next;
+    showPage(next,{scroll:true});
+  });
+});
+window.addEventListener('hashchange',()=>showPage(location.hash.slice(1)));
+showPage(location.hash.slice(1));
+
 const form = document.getElementById('builder');
 const output = document.getElementById('output');
 const submit = document.getElementById('submit');
@@ -264,6 +288,7 @@ function refreshVault() {
   refillSelect(mySelect,[...generated,...saved],'Choose your deck');
   refillSelect(opponentSelect,saved,'Choose a saved opponent');
   if(!mySelect.value && generated.length)mySelect.value=generated[chosen].id;
+  document.dispatchEvent(new Event('deck-vault-updated'));
 }
 function resolveDeck(value) {
   if(value.startsWith('generated:'))return decks[Number(value.split(':')[1])]||null;
@@ -332,6 +357,8 @@ mountDeckDoctor({
   openDeck(deck){
     decks=[deck];chosen=0;cardDisplay='list';
     render();
+    location.hash='generator';
+    showPage('generator');
     document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
   }
 });
