@@ -80,6 +80,11 @@ export function mountDeckDoctor({saveDeck,openDeck}){
       chart.append(elem('span','',name),elem('strong','',fmt(metrics.breakdown[key])));
     }
     section.append(chart);
+    const roles=elem('p','doctor-role-counts',
+      'Ramp '+metrics.roles.ramp+' · Draw '+metrics.roles.draw+
+      ' · Interaction '+metrics.roles.removal+' · Protection '+metrics.roles.protection+
+      ' · Wipes '+metrics.roles.wipe+' · Finishers '+metrics.roles.finisher);
+    section.append(roles);
     if(metrics.warnings?.length) {
       const notes=elem('div','doctor-notes');
       metrics.warnings.slice(0,5).forEach(w=>notes.append(elem('p','',w)));
