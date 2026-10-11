@@ -250,8 +250,8 @@ export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGai
   };
   for(let step=0;step<maxSwaps;step++){
     const shortage=state.lands<state.land_target;
-    const excess=state.lands>state.land_target+1;
     const needsColor=state.mana_balance.score<.995;
+    const excess=state.lands>state.land_target+3 && !needsColor;
     // A missing land gets first attention even if the deck has lots of
     // spells competing for higher role/engine points.
     const available=pool.filter(c=>duplicateAllowed(c)||!taken.has(norm(c)));
@@ -275,7 +275,7 @@ export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGai
         (excess?120:needsColor?28:-200):
         (shortage?50:0)+surplus*5-structural(c)*.85+
         Math.max(0,c.cmc-5)*.6+(r==='synergy'?7:0),
-        protectedEngine:f.enabler||f.payoff||f.leaderSupport};
+        protectedEngine:f.enabler||f.payoff};
     }).filter(p=>!usedPositions.has(p.i))
       .sort((a,b)=>b.weakness-a.weakness);
     const fromPositions=shortage?positions.filter(p=>!isLand(p.c)).slice(0,14):
@@ -346,7 +346,7 @@ export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGai
     swaps.push({
       out:best.old.name,in:best.added.name,gain:Number(best.gain.toFixed(2)),
       before:state.score,after:best.next.score,
-      reason:best.confidence==='Land count'?'Fix land count':
+      reason:best.confidence==='Land count'?'Land count correction':
         best.confidence==='Mana source'?'Improve colored mana access':
         'Improve missing role / recognizable synergy',
       evidence:changes.join(' · '),
