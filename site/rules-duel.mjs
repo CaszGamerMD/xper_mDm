@@ -80,6 +80,8 @@ export class RulesDuel extends LiveDuel {
   cast(index,target=null){this._require('main','respond');this._queue(0,index,false,target);return this.view();}
   castCommander(target=null){this._require('main','respond');this._queue(0,-1,true,target);return this.view();}
   playLand(index){
+    const card=this.players[0].hand[index];
+    if(card&&isLand(card)&&!supportInfo(card).supported)throw new DeckInputError('This complex land cannot be played in strict Rules Lab yet.');
     if(this.stack.length)throw new DeckInputError('Land plays are sorcery-speed actions and cannot occur with spells on the stack.');
     return super.playLand(index);
   }
@@ -178,6 +180,7 @@ export class RulesDuel extends LiveDuel {
     else {this.phase='bot';this._botNext();}
     return this.view();
   }
+  _attackers(side){return super._attackers(side).filter(o=>!hasAbility(o.card,'defender'));}
   beginCombat(ids=[]){
     if(this.stack.length)throw new DeckInputError('Finish resolving the stack before declaring attackers.');
     const result=super.beginCombat(ids);
@@ -242,7 +245,7 @@ export class RulesDuel extends LiveDuel {
     if(this.winner)return;
     const bot=this.players[1];
     if(bot.landDrops===0){
-      const i=bot.hand.findIndex(isLand);
+      const i=bot.hand.findIndex(c=>isLand(c)&&supportInfo(c).supported);
       if(i>=0){
         const [land]=bot.hand.splice(i,1);bot.landDrops++;
         this._addPermanent(1,land);this._log('AI plays '+land.name+'.');
