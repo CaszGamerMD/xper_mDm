@@ -122,44 +122,94 @@ export function manaBalance(cards,commander){
       c+': approximately '+sources[c]+' mana sources for '+demand[c].toFixed(1)+' colored symbols; target ~'+Math.ceil(targets[c])+' sources.')};
 }
 
+
+/** Cache immutable Oracle-text feature classification throughout a diagnosis.
+ * The former search ran dozens of regex checks three times per card for
+ * thousands of trial decks, blocking the browser on 20-swap requests.
+ */
+function factsFor(c,commander,context){
+  if(!context._facts)context._facts=new Map();
+  const key=norm(commander)+'|'+norm(c);
+  if(!context._facts.has(key))
+    context._facts.set(key,synergyFeatures(c,context.plan,context.tribes,commander));
+  return context._facts.get(key);
+}
+function roleFor(c,context){
+  if(!context._roles)context._roles=new Map();
+  const key=norm(c);
+  if(!context._roles.has(key))context._roles.set(key,role(c));
+  return context._roles.get(key);
+}
+function targetLandCount(cards,commander){
+  const spells=cards.filter(c=>!isLand(c));
+  const avg=averageSpellManaValue(spells);
+  const ramps=spells.filter(c=>roleMatch(c,'ramp')).length;
+  // Broad baseline only. Dedicated low-land engines and fast mana are not
+  // fully understood: use conservative guidance instead of declaring invalid.
+  return Math.round(cap(37+(avg-3)*.85-Math.max(0,ramps-10)*.19,35,39));
+}
 function scoreCore(cards,commander,context){
   const spells=cards.filter(c=>!isLand(c));
   const lands=cards.filter(isLand);
+  const facts=spells.map(c=>factsFor(c,commander,context));
   const counts=Object.fromEntries([...SPREAD,'synergy'].map(r=>[r,0]));
-  for(const c of spells)counts[role(c)]++;
-  const coh=cohesionReport(spells,context.plan,context.tribes,commander);
+  for(const c of spells)counts[roleFor(c,context)]++;
+  const enablers=facts.filter(f=>f.enabler||f.tribe).length;
+  const payoffs=facts.filter(f=>f.payoff).length;
+  const connected=facts.filter(f=>f.coherent).length;
+  const intentional=Boolean(context.plan||context.tribes.length);
+  const cohesionScore=intentional?
+    Math.round(Math.min(100,35*Math.min(enablers/14,1)+
+    35*Math.min(payoffs/9,1)+
+    30*Math.min(connected/(spells.length*.52),1))):0;
+  const cohWarnings=[];
+  if(intentional&&enablers<9)cohWarnings.push('Engine lacks enough enablers ('+enablers+'); the plan may not start consistently.');
+  if(intentional&&payoffs<5)cohWarnings.push('Engine has only '+payoffs+' clear payoffs; it may generate value without a win condition.');
+  if(intentional&&connected<Math.ceil(spells.length*.35))
+    cohWarnings.push('Only '+connected+' of '+spells.length+' nonland cards clearly connect to the game plan.');
+  const coh={planKey:context.plan||(context.tribes.length?'tribal':null),
+    plan:PLANS[context.plan]?.label||(context.tribes[0]?context.tribes.join('/')+' tribal':'General value'),
+    enablers,payoffs,connected,score:cohesionScore,warnings:cohWarnings};
   const avg=averageSpellManaValue(spells);
   const rawParts={};
   const roles={};
   for(const key of SPREAD){
-    const value=WEIGHTS[key]*neededCount(counts[key],NEED[key]);
-    rawParts[key]=value;
+    rawParts[key]=WEIGHTS[key]*neededCount(counts[key],NEED[key]);
     roles[key]=counts[key];
   }
   const engine=20*coh.score/100;
   const mana=manaBalance(cards,commander);
-  const countPoints=9*cap(1-Math.abs(lands.length-37)/11);
+  const landTarget=targetLandCount(cards,commander);
+  const countPoints=11*cap(1-Math.abs(lands.length-landTarget)/10);
   const colorPoints=5*mana.score;
   const landPoints=countPoints+colorPoints;
+  // Previous model warned about 31-33 lands but granted less than one point
+  // to fixing each land, often preferring generic draw/removal instead.
+  const deficit=Math.max(0,landTarget-lands.length);
+  const landPenalty=Number((Math.pow(deficit,1.45)*1.8).toFixed(2));
   const curvePoints=6*cap(1-Math.abs(avg-3.0)/2.3);
+  // Commander fit uses cached spell features; the leader-only text bonus is
+  // still evaluated for alternate commander searches.
   const commanderPoints=commanderFit(commander,cards,context.plan,context.tribes);
-  // Gentle pressure to avoid decks with lots of totally disconnected cards
-  const connected=spells.filter(c=>synergyFeatures(c,context.plan,context.tribes,commander).coherent).length;
-  const strayPenalty=(context.plan||context.tribes.length)?Math.max(0,(spells.length*.28-connected))*.22:0;
+  const strayPenalty=intentional?Math.max(0,spells.length*.28-connected)*.22:0;
   const score=cap(Object.values(rawParts).reduce((a,b)=>a+b,0)+engine+
-    landPoints+curvePoints+commanderPoints-strayPenalty,0,100);
+    landPoints+curvePoints+commanderPoints-strayPenalty-landPenalty,0,100);
   const warnings=[...coh.warnings,...mana.warnings];
-  if(lands.length<34||lands.length>40)warnings.push(lands.length+' lands: recommended starting point is around 37, adjusted for your build.');
+  if(lands.length<landTarget)warnings.push(lands.length+' lands: estimated target '+landTarget+' for this curve/ramp. Add '+(landTarget-lands.length)+' land(s), unless the deck has a proven low-land engine.');
+  if(lands.length>landTarget+2)warnings.push(lands.length+' lands: estimated target '+landTarget+'. Check if the extra lands are necessary.');
   if(counts.ramp<7)warnings.push('Low ramp density ('+counts.ramp+').');
   if(counts.draw<7)warnings.push('Low card-advantage density ('+counts.draw+').');
   if(counts.removal<5)warnings.push('Few spot interactions ('+counts.removal+').');
   if(avg>4)warnings.push('High average nonland mana value ('+avg.toFixed(2)+').');
-  return {score:Number(score.toFixed(2)),lands:lands.length,average_cmc:Number(avg.toFixed(2)),
-    roles,cohesion:coh,commander_fit:commanderPoints,connected,warnings,mana_balance:mana,
+  return {score:Number(score.toFixed(2)),lands:lands.length,land_target:landTarget,
+    average_cmc:Number(avg.toFixed(2)),roles,cohesion:coh,
+    commander_fit:commanderPoints,connected,warnings,mana_balance:mana,
     breakdown:{roles:Number(Object.values(rawParts).reduce((a,b)=>a+b,0).toFixed(1)),
       engine:Number(engine.toFixed(1)),mana_base:Number(landPoints.toFixed(1)),
+      land_penalty:-landPenalty,
       mana_curve:Number(curvePoints.toFixed(1)),commander:commanderPoints}};
 }
+
 export function rateDeck(cards,commander,context=null){
   const source=cards.map(coerce);
   const leader=coerce(commander);
