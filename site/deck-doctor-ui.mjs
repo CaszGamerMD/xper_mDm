@@ -85,6 +85,12 @@ export function mountDeckDoctor({saveDeck,openDeck}){
       ' · Interaction '+metrics.roles.removal+' · Protection '+metrics.roles.protection+
       ' · Wipes '+metrics.roles.wipe+' · Finishers '+metrics.roles.finisher);
     section.append(roles);
+    if(metrics.mana_balance){
+      const mana=metrics.mana_balance;
+      const line=elem('p','doctor-mana-sources','Colored mana access: '+
+        mana.colors.map(c=>c+' '+mana.sources[c]+'/'+Math.ceil(mana.targets[c])+' estimated sources').join(' · '));
+      section.append(line);
+    }
     if(metrics.warnings?.length) {
       const notes=elem('div','doctor-notes');
       metrics.warnings.slice(0,5).forEach(w=>notes.append(elem('p','',w)));
@@ -135,8 +141,18 @@ export function mountDeckDoctor({saveDeck,openDeck}){
       cell.colSpan=4;row.append(cell);body.append(row);
     }else for(const swap of result.swaps){
       const row=elem('tr');
-      for(const text of [swap.out,swap.in,swap.reason,'+'+fmt(swap.gain)])
-        row.append(elem('td','',text));
+      for(const card of [swap.outCard||{name:swap.out},swap.inCard||{name:swap.in}]){
+        const td=elem('td','doctor-card-cell');
+        const tile=elem('div','doctor-card-link');
+        if(card.image){
+          const img=elem('img','doctor-swap-art');img.src=card.image;img.alt=card.name;img.loading='lazy';
+          tile.append(img);
+        }
+        const link=elem('a','',card.name);
+        if(card.url){link.href=card.url;link.target='_blank';link.rel='noopener noreferrer';}
+        tile.append(link);td.append(tile);row.append(td);
+      }
+      row.append(elem('td','',swap.reason),elem('td','','+'+fmt(swap.gain)));
       body.append(row);
     }
     table.append(body);results.append(elem('h3','','Proposed card-for-card swaps'),table);
