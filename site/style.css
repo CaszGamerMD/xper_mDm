@@ -176,3 +176,5 @@
 @media(max-width:860px){.doctor-inputs{grid-template-columns:1fr 1fr}}
 @media(max-width:660px){.doctor-inputs,.doctor-score-grid{grid-template-columns:1fr}
   .doctor-swap-table{font-size:11px}.doctor-swap-table td:nth-child(3),.doctor-swap-table th:nth-child(3){display:none}}
+
+.doctor-role-counts{margin:12px 0 0;font-size:11px;line-height:1.8;color:var(--muted)}
