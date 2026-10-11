@@ -12,6 +12,23 @@ let decks = [];
 let chosen = 0;
 let cardDisplay = 'list';
 let cardSort = 'type-cmc';
+let generationVersion = 0;
+const CARD_SCALE_KEY = 'xper_mDm.card_scale.v1';
+function normalizeScale(value) {
+  const n=Number(value);
+  return Number.isFinite(n) && n >= 0.9 && n <= 1.8 ? Math.round(n*10)/10 : 1;
+}
+const cardScale=document.getElementById('card-scale');
+const cardScaleValue=document.getElementById('card-scale-value');
+function applyScale(value) {
+  const scale=normalizeScale(value);
+  document.documentElement.style.setProperty('--card-scale',String(scale));
+  cardScale.value=String(scale);
+  cardScaleValue.textContent=Math.round(scale*100)+'%';
+  try {window.localStorage.setItem(CARD_SCALE_KEY,String(scale));} catch {/* Browsers may deny local storage. */}
+}
+try {applyScale(window.localStorage.getItem(CARD_SCALE_KEY)||1);} catch {applyScale(1);}
+cardScale.addEventListener('input',()=>applyScale(cardScale.value));
 
 function elt(tag, className, text) {
   const node = document.createElement(tag);
@@ -67,18 +84,42 @@ form.addEventListener('submit', async e => {
     target_cmc:curveToggle.checked ? Number(curveSlider.value) : null,
     options: Number(document.getElementById('options').value)
   };
+  const thisGeneration=++generationVersion;
   submit.disabled = true; submitText.textContent = 'Forging…'; showLoading();
   try {
-    decks = await generateDecks(payload, message => {
+    const generated=await generateDecks(payload, message => {
+      if(thisGeneration !== generationVersion)return;
       const label = output.querySelector('p');
       if (label) label.textContent = message;
     });
-    chosen = 0;
+    if(thisGeneration !== generationVersion)return;
+    decks=generated;chosen = 0;
     if (!decks.length) throw new Error('No legal deck options found for these inputs.');
     render();
   } catch (error) {
-    showError(error.message || 'Deck generation failed. Please try again.');
-  } finally { submit.disabled = false; submitText.textContent = 'Forge decks'; }
+    if(thisGeneration === generationVersion)showError(error.message || 'Deck generation failed. Please try again.');
+  } finally {
+    if(thisGeneration === generationVersion){submit.disabled = false; submitText.textContent = 'Forge decks';}
+  }
+});
+
+document.getElementById('clear-builder').addEventListener('click',()=>{
+  // Invalidate older in-flight deck-generation responses so they cannot refill the UI.
+  generationVersion++;
+  form.reset();
+  colors.clear();
+  for(const chip of document.querySelectorAll('[data-color]'))chip.setAttribute('aria-pressed','false');
+  curveSlider.disabled=true;
+  curveValue.textContent=Number(curveSlider.value).toFixed(1);
+  document.getElementById('prompt-preview').textContent='';
+  decks=[];chosen=0;cardDisplay='list';cardSort='type-cmc';
+  submit.disabled=false;submitText.textContent='Forge decks';
+  output.className='placeholder';
+  const back=elt('div','placeholder-art');
+  for(const cls of ['one','two','three'])back.append(elt('div','deck-back '+cls,cls==='three'?'✦':undefined));
+  output.replaceChildren(back,elt('h3','','Ready for a fresh deck.'),elt('p','','All builder inputs are cleared. Your locally saved decks are still available below.'));
+  refreshVault();
+  document.getElementById('tribes').focus();
 });
 
 function render() {
