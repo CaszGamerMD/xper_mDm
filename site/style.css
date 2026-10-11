@@ -59,3 +59,42 @@
 .play-log summary{cursor:pointer;padding:13px;font-weight:700;font-size:13px}
 .play-log pre{max-height:460px;overflow:auto;white-space:pre-wrap;padding:15px;margin:0;font-size:12px;line-height:1.75;color:#cedde7;border-top:1px solid var(--border)}
 @media(max-width:750px){.play-grid{grid-template-columns:1fr}.play-panel{padding:19px}}
+
+/* Interactive Commander table: compact card art, user action panel and battle zones. */
+.live-game{margin:25px 0;padding:19px;background:#0d151d;border:1px solid #4e786b;border-radius:15px}
+.live-game:empty{display:none}
+.duel-heading,.duel-player-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.duel-heading{margin-bottom:15px}.duel-heading h3{margin:0;font-size:20px}
+.duel-phase{font-size:12px;color:var(--gold);background:#29352e;border:1px solid #4a6149;border-radius:20px;padding:7px 12px}
+.duel-field,.duel-hand{padding:16px;border:1px solid var(--border);border-radius:11px;background:#151d27;margin:12px 0}
+.duel-player-title{font-size:12px;color:var(--muted)}
+.duel-player-title strong{color:var(--text);font-size:15px}
+.duel-life{color:#ffb2a5;font-size:17px;font-weight:800}
+.duel-battlefield{display:flex;flex-wrap:wrap;gap:12px;margin-top:13px;min-height:120px}
+.duel-empty{font-size:12px;color:var(--muted)}
+.duel-permanent{width:101px;min-width:0;display:flex;flex-direction:column;gap:4px;position:relative}
+.duel-permanent.is-tapped .duel-permanent-art{transform:rotate(6deg);filter:brightness(.58)}
+.duel-permanent-art img,.duel-card img{display:block;width:100%;border-radius:7px;aspect-ratio:488/680;object-fit:cover}
+.duel-permanent-art{width:100%;height:125px;overflow:hidden;border-radius:8px;border:1px solid #394b57}
+.duel-permanent-art img{height:125px;object-fit:cover;object-position:top}
+.duel-permanent-label{font-size:10px;line-height:1.4;overflow-wrap:anywhere;color:var(--text)}
+.duel-check{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);cursor:pointer}
+.duel-controls{padding:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1b302b;border:1px solid #4d6c5e;border-radius:10px}
+.duel-controls .duel-instruction{width:100%;margin:0;font-size:12px;line-height:1.6;color:#e5f5ee}
+.duel-controls .action{cursor:pointer}
+.duel-controls .action:disabled{cursor:not-allowed;opacity:.4}
+.duel-hand h4{font-size:14px;margin:0 0 14px}
+.duel-hand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:13px}
+.duel-hand-card{padding:9px;border:1px solid #3b4c54;border-radius:10px;background:#0c151e;display:flex;flex-direction:column;gap:8px;min-width:0}
+.duel-hand-card .duel-card{width:100%}
+.duel-hand-label{font-size:11px;line-height:1.4;min-height:31px}
+.duel-hand-card .action{font-size:11px}
+.duel-hand-card .action:disabled{opacity:.4;cursor:not-allowed}
+.duel-target{border:1px solid #465e65;border-radius:7px;padding:8px;background:#0c151e;color:var(--text);max-width:100%;font-size:12px}
+.duel-fallback{display:grid;place-items:center;border:1px solid #63727c;padding:12px;border-radius:9px;height:110px;font-size:12px;color:var(--gold)}
+.duel-block-pairs{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+.duel-block-pairs label{display:flex;flex-direction:column;gap:7px;font-size:12px}
+.duel-log{margin-top:17px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.duel-log summary{padding:11px;cursor:pointer;background:#202e39;font-size:12px}
+.duel-log pre{margin:0;padding:14px;font-size:12px;color:var(--muted);max-height:320px;overflow:auto;white-space:pre-wrap;line-height:1.6}
+@media(max-width:560px){.live-game{padding:10px}.duel-field,.duel-hand{padding:10px}.duel-hand-grid{grid-template-columns:repeat(auto-fill,minmax(114px,1fr));gap:9px}.duel-permanent{width:81px}.duel-permanent-art,.duel-permanent-art img{height:103px}}
