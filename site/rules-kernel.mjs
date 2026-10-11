@@ -51,7 +51,6 @@ export function supportedShare(deck){
     return state;
   },{total:0,supported:0,unsupported:[]});
   const commander=supportInfo(deck.commander);
-  if(!commander.supported)list.unshift(); // no-op: commander is reported separately
   return {...seen,commanderSupported:commander.supported,commanderReason:commander.reason||'',
     percentage:seen.total?Math.round(100*seen.supported/seen.total):0};
 }
