@@ -128,7 +128,8 @@ export class RulesDuel extends LiveDuel {
         }else if(kind==='exile'){
           this.players[player].battlefield=this.players[player].battlefield.filter(o=>o.uid!==obj.uid);
           if(obj.commander)this.players[player].commanderInZone=true;
-          this._log(obj.card.name+' is exiled (commanders return to command zone).');
+          else this.players[player].exile.push(obj.card);
+          this._log(obj.card.name+' moves to '+(obj.commander?'the command zone':'exile')+'.');
         }else this._destroy(obj,player);
         break;
       }
@@ -165,8 +166,11 @@ export class RulesDuel extends LiveDuel {
     const index=bot.hand.findIndex(c=>supportInfo(c).kind==='counter'&&this.canCast(1,c));
     if(index<0)return false;
     const response=bot.hand[index];
-    this._log('AI holds priority to counter '+top.card.name+'.');
-    this._queue(1,index,false,top.id);
+    this.pendingAi={index,command:false,target:top.id,card:response,
+      description:'AI proposes to counter your spell '+top.card.name+
+      ' with '+response.name+'. Acknowledge it, then you may respond with an instant.'};
+    this.phase='confirm-ai';
+    this._log('AI intends to counter '+top.card.name+' and awaits acknowledgment.');
     return true;
   }
   passPriority(){
@@ -257,7 +261,15 @@ export class RulesDuel extends LiveDuel {
       choices.push({card:bot.commander,index:-1,commander:true});
     choices.sort((a,b)=>(Number(b.card.cmc)||0)-(Number(a.card.cmc)||0));
     if(choices.length){
-      const c=choices[0];this._queue(1,c.index,c.commander);
+      const c=choices[0];
+      if(this._botActionNeedsReview(c.card)){
+        this.pendingAi={index:c.index,command:c.commander,card:c.card,
+          description:'AI is preparing '+c.card.name+
+          '. Acknowledge its proposed action, then you will get a priority window to respond before resolution.'};
+        this.phase='confirm-ai';
+        return;
+      }
+      this._queue(1,c.index,c.commander);
       this.phase='respond';this._log('You may respond with an instant, or pass to resolve.');
       return;
     }
@@ -267,6 +279,17 @@ export class RulesDuel extends LiveDuel {
     this.pendingAttack=attackers.map(o=>o.uid);
     this.phase='defend';
     this._log('AI attacks with '+attackers.map(x=>x.card.name).join(', ')+'.');
+  }
+  confirmAiAction(){
+    this._require('confirm-ai');
+    if(!this.pendingAi)throw new DeckInputError('There is no pending AI spell.');
+    const choice=this.pendingAi;
+    this.pendingAi=null;this.phase='bot';
+    this._log('You acknowledged the AI spell '+choice.card.name+'.');
+    this._queue(1,choice.index,choice.command,choice.target??null);
+    this.phase='respond';
+    this._log('You may respond with supported instants before the stack resolves.');
+    return this.view();
   }
   _botPlay(){this._botNext();}
   endTurn(){

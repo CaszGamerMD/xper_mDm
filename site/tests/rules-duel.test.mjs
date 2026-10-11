@@ -69,6 +69,8 @@ test('counterspell stays on top, then counters the original spell',()=>{
   d.cast(index);
   assert.equal(d.stack.at(-1).card.name,'Divination');
   d.passPriority();
+  assert.equal(d.phase,'confirm-ai');
+  d.confirmAiAction();
   assert.equal(d.stack.length,2);
   assert.equal(d.stack.at(-1).card.name,'Counterspell');
   d.passPriority();
@@ -164,7 +166,9 @@ test('counter-counter stack chain correctly restores the original spell',()=>{
   d.players[0].hand.push(draw2,counter);
   d.players[1].hand.push(counter);
   d.cast(d.players[0].hand.findIndex(c=>c.name==='Divination'));
-  d.passPriority(); // AI counters our draw spell
+  d.passPriority(); // AI proposes to counter our draw spell
+  assert.equal(d.phase,'confirm-ai');
+  d.confirmAiAction();
   assert.equal(d.stack.length,2);
   const counterIndex=d.players[0].hand.findIndex(c=>c.name==='Counterspell');
   d.cast(counterIndex,d.stack.at(-1).id);
@@ -189,7 +193,9 @@ test('countering a commander returns it to the command zone without increasing t
   d.players[1].hand.push(counter);
   d.castCommander();
   assert.equal(d.players[0].commanderTax,2);
-  d.passPriority(); // AI counters
+  d.passPriority(); // AI proposes a counter
+  assert.equal(d.phase,'confirm-ai');
+  d.confirmAiAction();
   d.passPriority(); // Counter resolves
   assert.equal(d.players[0].commanderInZone,true);
   assert.equal(d.players[0].commanderTax,2);
