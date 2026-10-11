@@ -260,7 +260,7 @@ export class DeckDoctor {
     pool.push(...await this.source.collection(['Sol Ring','Arcane Signet','Swords to Plowshares',
       'Beast Within','Chaos Warp','Cultivate','Kodama\'s Reach','Counterspell',
       'Brainstorm','Night\'s Whisper','Harmonize','Skullclamp','Swiftfoot Boots']));
-    const result=ordered(pool,360).filter(c=>c.eligible&&withinIdentity(c,commander));
+    const result=ordered(pool,900).filter(c=>c.eligible&&withinIdentity(c,commander));
     // Favor lower-curve candidates when the submitted curve is very high, but
     // never remove an expensive card solely due to its cost.
     result.sort((a,b)=>{
@@ -316,8 +316,10 @@ export class DeckDoctor {
     }
     const originalDeck=deckView(loaded.cards,loaded.commander,original,'Deck Doctor · Original');
     const upgradedDeck=deckView(tuned.cards,tuned.commander,tuned.after,'Deck Doctor · Minimal changes');
+    const commanderOnlyDeck=suggestion?
+      deckView(loaded.cards,suggestion.commander,suggestion.score,'Deck Doctor · Commander-only alternative'):null;
     return {original,upgraded:tuned.after,swaps:tuned.swaps,originalDeck,upgradedDeck,
-      originalCommander:loaded.commander.name,commanderSuggestion:suggestion,
+      originalCommander:loaded.commander.name,commanderSuggestion:suggestion,commanderOnlyDeck,
       keptCount:99-tuned.swaps.length,maxSwaps,context,considerCommander};
   }
 }
