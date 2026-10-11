@@ -166,8 +166,11 @@ export class RulesDuel extends LiveDuel {
     const index=bot.hand.findIndex(c=>supportInfo(c).kind==='counter'&&this.canCast(1,c));
     if(index<0)return false;
     const response=bot.hand[index];
-    this._log('AI holds priority to counter '+top.card.name+'.');
-    this._queue(1,index,false,top.id);
+    this.pendingAi={index,command:false,target:top.id,card:response,
+      description:'AI proposes to counter your spell '+top.card.name+
+      ' with '+response.name+'. Acknowledge it, then you may respond with an instant.'};
+    this.phase='confirm-ai';
+    this._log('AI intends to counter '+top.card.name+' and awaits acknowledgment.');
     return true;
   }
   passPriority(){
@@ -283,7 +286,7 @@ export class RulesDuel extends LiveDuel {
     const choice=this.pendingAi;
     this.pendingAi=null;this.phase='bot';
     this._log('You acknowledged the AI spell '+choice.card.name+'.');
-    this._queue(1,choice.index,choice.command);
+    this._queue(1,choice.index,choice.command,choice.target??null);
     this.phase='respond';
     this._log('You may respond with supported instants before the stack resolves.');
     return this.view();
