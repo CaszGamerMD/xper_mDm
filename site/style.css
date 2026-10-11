@@ -105,3 +105,5 @@
 .duel-stack{margin:13px 0;padding:13px;border:1px solid #ab9259;border-radius:9px;background:#352b1f;display:grid;gap:7px;font-size:12px}
 .duel-stack strong{color:var(--gold);font-size:13px}
 .duel-unsupported{font-size:10px;color:#ffbea9;line-height:1.4}
+
+.duel-unsupported-summary{border-left:3px solid #edaa72;background:#4f322b88;padding:12px;color:#ffe0b9;font-size:12px;line-height:1.6;border-radius:5px}
