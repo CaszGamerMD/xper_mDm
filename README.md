@@ -6,6 +6,17 @@ The main app lives in [`site/`](site/). It generates up to four 100-card Magic: 
 
 
 
+
+## Rules Lab milestone (v0.6) — fail-closed gameplay foundations
+
+The new **Rules Lab · strict effects** button starts an independent, experimental implementation alongside the older quick-play simulator. It introduces visible last-in-first-out spell stack resolution, human instant-speed responses, automatic AI counterspell reactions, target checks at casting and resolution, simultaneous creature combat damage, first strike/double strike, lifelink, deathtouch, trample, flying/reach, indestructible, commander tax applied upon casts, and pre/postcombat main-phase windows. It shows supported card percentage **for each deck** and clearly marks unsupported cards instead of pretending their abilities worked.
+
+This is **not yet full Magic**. The only effects recognized by this mode are simple basic mana lands, basic vanilla/evergreen-keyword creatures, and exact supported draw, single-target removal, counterspell, bounce, life gain, and damage spell texts. Many real Commander cards and commanders remain disabled. There is no complete APNAP priority loop, triggers, continuous/replacement effects, activated abilities, casting choices or the full five-phase timing sequence; full multi-blocker assignments are not modeled. Rules Lab coverage is a minimum threshold, **not a guarantee of correct results**.
+
+For meaningful rules acceptance testing, start with two minimal vanilla/evergreen decks or examine the coverage report; don't use this mode for detailed combo claims until the relevant abilities are implemented and tested. The existing **Play live vs AI** option keeps the broader, lower-fidelity practice mode for exploratory games.
+
+Reference for eventual comprehensive behavior: [Magic Comprehensive Rules](https://magic.wizards.com/en/rules), including rules 117 (priority), 405 (stack), 500 (turn structure), 510 (combat damage), and 903 (Commander).
+
 ## Interactive AI opponent — live practice (v0.5)
 
 In the saved-deck / playtest area choose a generated or stored player deck, select an imported **saved opponent deck**, and click **Play live vs AI**. The practice table renders opening hands, a free opening mulligan, a visible hand, battlefields, life totals and action log. You decide which land to play, cast spells or your commander, choose attackers, and assign blockers when the bot attacks. The opponent chooses cards to play and makes simple attacking/blocking decisions. Repeat and restart games without downloading anything.
