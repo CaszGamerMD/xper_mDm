@@ -16,7 +16,16 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   const stage=document.getElementById('live-game');
   const launch=document.getElementById('play-live');
   const launchRules=document.getElementById('play-rules');
-  let duel=null,chosen=new Set(),error='';
+  const mulliganChoice=document.getElementById('mulligan-mode');
+  const MULLIGAN_PREF='xper_mDm.mulligan_mode.v1';
+  try {
+    const stored=window.localStorage.getItem(MULLIGAN_PREF);
+    if(stored==='friendly'||stored==='strict')mulliganChoice.value=stored;
+  } catch {/* Browser storage is optional. */}
+  mulliganChoice.addEventListener('change',()=>{
+    try {window.localStorage.setItem(MULLIGAN_PREF,mulliganChoice.value);} catch {}
+  });
+  let duel=null,chosen=new Set(),bottomCards=new Set(),error='';
   const safe=fn=>()=>{try{fn();error='';render();}catch(e){error=e.message||'Action was not allowed.';render();}};
   function field(player,mine,phase) {
     const box=node('section','duel-field');
@@ -48,6 +57,17 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     you.hand.forEach((card,index)=>{
       const tile=node('div','duel-hand-card');
       tile.append(art(card,'duel-card'),node('div','duel-hand-label',desc(card)));
+      if(state.phase==='bottom'){
+        const control=node('label','duel-bottom-choice');
+        const checkbox=node('input');checkbox.type='checkbox';checkbox.checked=bottomCards.has(index);
+        checkbox.addEventListener('change',()=>{
+          if(checkbox.checked)bottomCards.add(index);
+          else bottomCards.delete(index);
+          render();
+        });
+        control.append(checkbox,document.createTextNode(' Put on library bottom'));
+        tile.append(control);
+      }
       if(state.phase==='main'||state.phase==='respond'){
         const land=isLand(card),ok=state.phase==='main'&&land?you.landsPlayed<1&&(!state.rulesLab||supportInfo(card).supported):!land&&duel.canCast(0,card);
         let select=null;
@@ -72,9 +92,21 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   function toolbar(state){
     const box=node('div','duel-controls'),you=state.players[0];
     if(state.phase==='opening'){
-      box.append(node('p','duel-instruction','Choose your opening hand. One free seven-card mulligan is available.'));
-      box.append(btn('Keep hand',safe(()=>duel.keep())));
-      const m=btn('Free mulligan',safe(()=>duel.mulligan()),true);m.disabled=!state.canMulligan;box.append(m);
+      const extra=state.mulliganMode==='strict'?' · on keep, bottom '+Math.max(0,state.mulligans-1)+' card(s)':' · no cards need to be bottomed';
+      box.append(node('p','duel-instruction',
+        (state.mulliganMode==='strict'?'STRICT':'FRIENDLY')+' mulligans: '+state.mulligans+
+        ' taken'+extra+'. You may shuffle and draw seven again.'));
+      box.append(btn('Keep this hand',safe(()=>{bottomCards=new Set();duel.keep();})));
+      const m=btn('Mulligan again · draw 7',safe(()=>{bottomCards=new Set();duel.mulligan();}),true);
+      m.disabled=!state.canMulligan;box.append(m);
+    }else if(state.phase==='bottom'){
+      box.append(node('p','duel-instruction','Strict mulligan: '+state.mulligans+
+        ' mulligan(s) taken. Select exactly '+state.bottomRequired+
+        ' card(s) from the hand below to place on the bottom of your library, then confirm.'));
+      const confirm=btn('Bottom selected '+bottomCards.size+' / '+state.bottomRequired+' · Start game',
+        safe(()=>{duel.putOnBottom([...bottomCards]);bottomCards=new Set();}));
+      confirm.disabled=bottomCards.size!==state.bottomRequired;
+      box.append(confirm);
     }else if(state.phase==='main'||state.phase==='respond'){
       const resolving=state.rulesLab&&state.stack.length>0;
       box.append(node('p','duel-instruction',resolving?'Priority window: cast a supported instant in response or pass to resolve the top spell.':
@@ -109,8 +141,9 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     }else if(state.phase==='finished'){
       box.append(node('h3','',state.winner===0?'You win!':'AI wins!'));
       box.append(btn('Restart duel',safe(()=>{
-        const decks=duel.originalDecks;duel=new duel.constructor(decks[0],decks[1],{seed:Date.now()});
-        duel.originalDecks=decks;chosen=new Set();
+        const decks=duel.originalDecks;
+        duel=new duel.constructor(decks[0],decks[1],{seed:Date.now(),mulliganMode:duel.mulliganMode});
+        duel.originalDecks=decks;chosen=new Set();bottomCards=new Set();
       })));
     }
     return box;
@@ -121,7 +154,7 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     const state=duel.view();
     const heading=node('div','duel-heading');
     heading.append(node('h3','','Interactive duel · round '+state.round),
-      node('span','duel-phase',({opening:'Opening hand',main:'Your main phase',respond:'Respond / stack',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
+      node('span','duel-phase',({opening:'Opening hand',bottom:'Strict · select bottom cards',main:'Your main phase',respond:'Respond / stack',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
     stage.append(heading);
     if(state.rulesLab){
       const coverage=node('div','duel-coverage');
@@ -156,8 +189,8 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   const start=(Ctor)=>safe(()=>{
     const mine=resolveDeck(mySelect.value),opponent=resolveDeck(opponentSelect.value);
     if(!mine||!opponent)throw new Error('Choose your deck and a saved opponent deck first.');
-    duel=new Ctor(mine,opponent,{seed:Date.now()});
-    duel.originalDecks=[mine,opponent];chosen=new Set();
+    duel=new Ctor(mine,opponent,{seed:Date.now(),mulliganMode:mulliganChoice.value});
+    duel.originalDecks=[mine,opponent];chosen=new Set();bottomCards=new Set();
     stage.scrollIntoView({behavior:'smooth',block:'start'});
   });
   launch.addEventListener('click',start(LiveDuel));
