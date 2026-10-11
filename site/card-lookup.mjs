@@ -29,8 +29,7 @@ function addResolved(byRequest,pending,cards) {
   }
 }
 export async function resolveCardNames(names,source) {
-  const unique=[...new Map(names.map(name=>[cardNameKey(name),String(name).trim()])).entries()].values()]
-    .map(([,name])=>name);
+  const unique=[...new Map(names.map(name=>[cardNameKey(name),String(name).trim()])).values()];
   const byRequest=new Map();
   if(!unique.length)return byRequest;
   // The original names can be sent in bulk; any normalized/full names that
