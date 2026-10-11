@@ -129,3 +129,52 @@
   .duel-permanent{width:calc(81px * var(--card-scale))}
   .duel-permanent-art,.duel-permanent-art img{height:calc(103px * var(--card-scale))}
 }
+
+
+/* Deck Doctor: local upload, explainable scoring and minimal-change repair */
+.doctor-form{display:grid;gap:15px;margin:21px 0}
+.doctor-inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.doctor-form .fieldgroup{min-width:0}
+.doctor-form input:not([type=checkbox]),.doctor-form select,.doctor-form textarea{
+  display:block;width:100%;box-sizing:border-box;background:#101923;color:var(--text);
+  border:1px solid #46515e;border-radius:8px;padding:11px;font:inherit;font-size:13px;
+}
+.doctor-form textarea{resize:vertical;min-height:200px;line-height:1.5}
+.doctor-switch{display:flex;align-items:center;gap:10px;grid-column:1/-1;
+  font-size:12px;line-height:1.5;color:var(--muted);cursor:pointer}
+.doctor-switch input{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0}
+.doctor-form .generate{width:100%}
+.doctor-form .generate:disabled{opacity:.65;cursor:wait}
+.doctor-output:empty{display:none}
+.doctor-score-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0}
+.doctor-score-card{border:1px solid var(--border);border-radius:11px;background:#111923;padding:18px}
+.doctor-score-card h3{font-size:16px;margin:0 0 15px}
+.doctor-score-card .metrics{margin:0 0 14px}
+.doctor-score-card .metric{padding:8px 10px}
+.doctor-breakdown{display:grid;grid-template-columns:1fr auto;gap:5px 13px;
+  border-top:1px solid var(--border);padding-top:12px;font-size:12px;color:var(--muted)}
+.doctor-breakdown strong{color:var(--accent);font-variant-numeric:tabular-nums}
+.doctor-notes{font-size:11px;line-height:1.6;color:var(--gold);margin-top:12px}
+.doctor-notes p{margin:5px 0}
+.doctor-highlight{font-size:13px;line-height:1.65;font-weight:700;padding:12px 14px;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.doctor-swap-table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0 18px}
+.doctor-swap-table td,.doctor-swap-table th{border-bottom:1px solid var(--border);
+  padding:9px 8px;text-align:left;overflow-wrap:anywhere}
+.doctor-swap-table th{font-size:11px;color:var(--muted)}
+.doctor-swap-table td:last-child{color:var(--accent);white-space:nowrap;font-weight:700}
+.doctor-result-actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 24px}
+.doctor-text{width:100%;border:1px solid var(--border);border-radius:9px;
+  background:#131c24;padding:12px}
+.doctor-text summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:700}
+.doctor-text textarea{display:block;box-sizing:border-box;width:100%;margin-top:10px;padding:12px;
+  background:#0d141b;border:1px solid #46515e;color:var(--text);resize:vertical;font:12px/1.65 monospace}
+.doctor-commander{border-left:3px solid var(--gold);border-radius:8px;
+  padding:14px 16px;background:#59472326;margin:20px 0}
+.doctor-commander h3{font-size:16px;margin:0 0 8px}
+.doctor-commander p{font-size:12px;line-height:1.65}
+@media(max-width:860px){.doctor-inputs{grid-template-columns:1fr 1fr}}
+@media(max-width:660px){.doctor-inputs,.doctor-score-grid{grid-template-columns:1fr}
+  .doctor-swap-table{font-size:11px}.doctor-swap-table td:nth-child(3),.doctor-swap-table th:nth-child(3){display:none}}
+
+.doctor-role-counts{margin:12px 0 0;font-size:11px;line-height:1.8;color:var(--muted)}

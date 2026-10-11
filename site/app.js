@@ -3,6 +3,7 @@ import { sortedCardGroups } from "./presentation.mjs";
 import { interpretPrompt } from "./intent.mjs";
 import {DeckLibrary, importDecklist, simulateSeries} from "./playtest.mjs";
 import {mountLiveArena} from "./live-ui.mjs";
+import {mountDeckDoctor} from "./deck-doctor-ui.mjs";
 const form = document.getElementById('builder');
 const output = document.getElementById('output');
 const submit = document.getElementById('submit');
@@ -321,3 +322,16 @@ document.getElementById('play-match').addEventListener('click',()=>{
 });
 
 mountLiveArena({mySelect,opponentSelect,resolveDeck});
+
+mountDeckDoctor({
+  saveDeck(deck){
+    vault.save(deck);
+    refreshVault();
+    showVaultStatus('Saved '+deck.name+' to this browser.');
+  },
+  openDeck(deck){
+    decks=[deck];chosen=0;cardDisplay='list';
+    render();
+    document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+});
