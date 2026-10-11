@@ -8,6 +8,7 @@
  * abilities, timing, and many card-specific rules are NOT implemented.
  */
 import {DeckInputError} from './generator.mjs';
+import {normalizeMulliganMode,bottomRequired,bottomSelected,chooseBotBottom} from './mulligan.mjs';
 
 const lc=value=>String(value||'').toLowerCase();
 const typeOf=card=>String(card.type||card.type_line||'').split(' // ')[0];
@@ -114,27 +115,56 @@ function newPlayer(deck,random){
     commanderInZone:true,commanderDamage:0,turns:0,mulligans:0,kept:false};
 }
 export class LiveDuel {
-  constructor(mine,opponent,{seed=17}={}) {
+  constructor(mine,opponent,{seed=17,mulliganMode='friendly'}={}) {
+    this.mulliganMode=normalizeMulliganMode(mulliganMode);
     this.random=randomizer(seed);this.players=[newPlayer(mine,this.random),newPlayer(opponent,this.random)];
     this.id=0;this.round=1;this.serial=0;this.phase='opening';this.winner=null;
     this.log=['Practice match prepared. This is a simplified rules sandbox, not full Magic.'];
     this.pendingAttack=[];this.attackOwner=0;this.humanAttacked=false;
     this.playerManaBonus=0;this.usedBonus=0;
     const bot=this.players[1];
-    if(this._landCount(bot.hand)<2||this._landCount(bot.hand)>5)this._mulligan(1);
+    while(bot.mulligans<3 && (this._landCount(bot.hand)<2||this._landCount(bot.hand)>5))this._mulligan(1);
     bot.kept=true;
+    const botRequired=bottomRequired(this.mulliganMode,bot.mulligans);
+    if(botRequired){
+      const selected=chooseBotBottom(bot.hand,botRequired);
+      bottomSelected(bot.hand,bot.library,selected,botRequired);
+      this._log('AI took '+bot.mulligans+' strict mulligan(s), bottomed '+botRequired+' cards and kept '+bot.hand.length+'.');
+    } else if(bot.mulligans) this._log('AI took '+bot.mulligans+' friendly mulligan(s) and kept seven.');
   }
   _landCount(cards){return cards.filter(isLand).length;}
   _log(message){this.log.push(message);if(this.log.length>250)this.log.shift();}
   _require(...allowed){if(!allowed.includes(this.phase)||this.winner)throw new DeckInputError('That action is not available during '+this.phase+'.');}
   _mulligan(side){
     const p=this.players[side];if(p.kept)throw new DeckInputError('Opening hand has been kept.');
-    if(p.mulligans>=1)throw new DeckInputError('This practice mode supports one free mulligan only.');
+    if(this.mulliganMode==='strict' && p.mulligans>=8)
+      throw new DeckInputError('At most eight Strict mulligans can be used with a seven-card opening hand.');
     const all=shuffle([...p.library,...p.hand],this.random);
     p.hand=all.splice(0,7);p.library=all;p.mulligans++;
   }
-  mulligan(){this._require('opening');this._mulligan(0);this._log('You take a free mulligan.');return this.view();}
-  keep(){this._require('opening');this.players[0].kept=true;this._startTurn(0,true);return this.view();}
+  mulligan(){
+    this._require('opening');
+    this._mulligan(0);
+    this._log('You take mulligan #'+this.players[0].mulligans+' ('+this.mulliganMode+').');
+    return this.view();
+  }
+  keep(){
+    this._require('opening');
+    const p=this.players[0];p.kept=true;
+    const count=bottomRequired(this.mulliganMode,p.mulligans);
+    if(count>0){this.phase='bottom';this._log('Select exactly '+count+' card(s) to put on the bottom of your library.');}
+    else this._startTurn(0,true);
+    return this.view();
+  }
+  putOnBottom(indices){
+    this._require('bottom');
+    const p=this.players[0];
+    const count=bottomRequired(this.mulliganMode,p.mulligans);
+    const bottomed=bottomSelected(p.hand,p.library,indices,count);
+    this._log('You put '+bottomed.length+' card(s) on the bottom and keep '+p.hand.length+'.');
+    this._startTurn(0,true);
+    return this.view();
+  }
   _draw(side,n=1) {
     const p=this.players[side];
     for(let i=0;i<n;i++) {
@@ -410,7 +440,9 @@ export class LiveDuel {
       canCastCommander:i===0&&this.phase==='main'&&p.commanderInZone&&this.canCast(0,p.commander,true)
     }));
     return {phase:this.phase,winner:this.winner,round:this.round,log:this.log.slice(),
-      players,attackers:this.pendingAttack.slice(),canMulligan:this.phase==='opening'&&this.players[0].mulligans===0,
+      players,attackers:this.pendingAttack.slice(),canMulligan:this.phase==='opening'&&(this.mulliganMode==='friendly'||this.players[0].mulligans<8),
+      mulliganMode:this.mulliganMode,mulligans:this.players[0].mulligans,
+      bottomRequired:this.phase==='bottom'?bottomRequired(this.mulliganMode,this.players[0].mulligans):0,
       humanAttacked:this.humanAttacked};
   }
 }
