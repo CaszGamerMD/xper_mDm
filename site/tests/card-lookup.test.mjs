@@ -7,7 +7,7 @@ const FULL='Halvar, God of Battle // Sword of the Realms';
 const FRONT='Halvar, God of Battle';
 const BACK='Sword of the Realms';
 const halvar={name:FULL,type_line:'Legendary Creature — God // Legendary Artifact — Equipment',
-  oracle_text:'Creatures you control that are enchanted or equipped have double strike.\\nEquipped creature gets +2/+0.',
+  oracle_text:'Creatures you control that are enchanted or equipped have double strike.\nEquipped creature gets +2/+0.',
   color_identity:['W'],cmc:4,creature:true,land:false,basic:false,eligible:true,
   commander:true,keywords:[],mana_cost:'{2}{W}{W}',oracle_id:'halvar-canonical'};
 const commander={name:'White Commander',type_line:'Legendary Creature — Human',
@@ -36,7 +36,7 @@ class BrokenBulkSource {
   }
 }
 const makeList=(dfc=FULL,leader='White Commander')=>
-  '// Commander\\n1 '+leader+'\\n// Deck\\n97 Plains\\n1 Sol Ring\\n1 '+dfc+'\\n';
+  '// Commander\n1 '+leader+'\n// Deck\n97 Plains\n1 Sol Ring\n1 '+dfc+'\n';
 test('canonical DFC names compare with normalized front/back spacing',()=>{
   assert.equal(cardNameKey(' HALVAR, God of Battle//Sword of the Realms '),cardNameKey(FULL));
   assert.deepEqual(cardFaceNames(FULL),[FRONT,BACK]);
@@ -92,13 +92,13 @@ test('opponent import shares the same DFC name resolution and canonically export
 });
 test('DFC duplicates entered under full and front names fail singleton validation',async()=>{
   const source=new BrokenBulkSource();
-  const bad='// Commander\\n1 White Commander\\n// Deck\\n96 Plains\\n1 Sol Ring\\n1 '+FULL+'\\n1 '+FRONT+'\\n';
+  const bad='// Commander\n1 White Commander\n// Deck\n96 Plains\n1 Sol Ring\n1 '+FULL+'\n1 '+FRONT+'\n';
   await assert.rejects(()=>new DeckDoctor(source).loadList(bad),/Singleton violation/);
   await assert.rejects(()=>importDecklist(bad,'',source),/singleton violation/);
 });
 test('Halvar can be resolved when the double-faced card is the deck commander',async()=>{
   const source=new BrokenBulkSource();
-  const list='// Commander\\n1 '+FULL+'\\n// Deck\\n98 Plains\\n1 Sol Ring\\n';
+  const list='// Commander\n1 '+FULL+'\n// Deck\n98 Plains\n1 Sol Ring\n';
   const deck=await new DeckDoctor(source).loadList(list);
   assert.equal(deck.commander.name,FULL);
   assert.equal(deck.cards.length,99);
