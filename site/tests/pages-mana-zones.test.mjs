@@ -81,7 +81,9 @@ test('quick AI targeting player battlefield pauses until acknowledged and zones 
  assert.equal(d.phase,'confirm-ai');
  assert.equal(d.view().pendingAi.card.name,'Assassinate');
  assert.ok(d.players[0].battlefield.some(x=>x.uid===victim.uid));
- assert.throws(()=>d.confirmAiAction.call({...d,phase:'main'}),/not available/);
+ d.phase='main';
+ assert.throws(()=>d.confirmAiAction(),/not available/);
+ d.phase='confirm-ai';
  d.confirmAiAction();
  assert.ok(!d.players[0].battlefield.some(x=>x.uid===victim.uid));
  assert.ok(d.view().players[0].graveyardCards.some(c=>c.name==='Victim Frog'));
