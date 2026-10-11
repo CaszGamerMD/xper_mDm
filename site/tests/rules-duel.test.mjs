@@ -45,7 +45,7 @@ test('unsupported engine cards are disabled, not falsely executed',()=>{
   assert.equal(d.stack.length,0);
 });
 test('spells stay on stack until priority pass, then LIFO resolve',()=>{
-  const d=setup();land(d,0,island,3);
+  const d=setup();land(d,0,island,4);
   d.players[0].hand.push(draw2,brainstorm);
   const old=d.players[0].hand.length;
   d.cast(old-2);
@@ -78,7 +78,7 @@ test('counterspell stays on top, then counters the original spell',()=>{
   assert.ok(d.log.some(x=>x.includes('counters Divination')));
 });
 test('permanents enter after spell resolves and commander tax counts casts, not deaths',()=>{
-  const d=setup();land(d,0,forest,3);
+  const d=setup();land(d,0,forest,5);
   d.players[0].hand.push(bear);
   d.cast(d.players[0].hand.length-1);
   assert.equal(d.players[0].battlefield.filter(o=>o.card.name==='Grizzly Bears').length,0);
