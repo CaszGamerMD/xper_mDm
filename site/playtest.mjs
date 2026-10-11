@@ -4,6 +4,7 @@
  */
 import {ScryfallSource, withinIdentity, DeckInputError} from './generator.mjs';
 import {deckPlan, synergyFeatures} from './synergy.mjs';
+import {cardNameKey,lookupNamedCard,resolveCardNames} from './card-lookup.mjs';
 const BASIC=/^(plains|island|swamp|mountain|forest|wastes)$/i;
 const NAME=String;
 export function parseDecklist(text, commanderName='') {
@@ -45,15 +46,14 @@ function cardView(card,quantity=1){
 }
 export async function importDecklist(text, commanderName='', source=new ScryfallSource()){
   const parsed=parseDecklist(text,commanderName);
-  const commander=await source.named(parsed.commander);
+  const commander=await lookupNamedCard(parsed.commander,source);
   if(!commander || !commander.eligible || !commander.commander)
     throw new DeckInputError('Commander not found or illegal: '+parsed.commander+'.');
-  const found=await source.collection(parsed.entries.map(c=>c.name));
-  const lookup=new Map(found.map(c=>[c.name.toLowerCase(),c]));
+  const lookup=await resolveCardNames(parsed.entries.map(c=>c.name),source);
   const groups=new Map();
   const seen=new Set([commander.name.toLowerCase()]);
   for(const entry of parsed.entries) {
-    const card=lookup.get(entry.name.toLowerCase());
+    const card=lookup.get(cardNameKey(entry.name));
     if(!card) throw new DeckInputError('Card could not be verified with Scryfall: '+entry.name);
     if(!card.eligible || !withinIdentity(card,commander))
       throw new DeckInputError('Card is illegal with this commander: '+entry.name);

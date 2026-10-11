@@ -5,6 +5,7 @@
  */
 import {ScryfallSource,DeckInputError,withinIdentity,roleMatch,cardFromScryfall} from './generator.mjs';
 import {parseDecklist} from './playtest.mjs';
+import {cardNameKey,lookupNamedCard,resolveCardNames} from './card-lookup.mjs';
 import {deckPlan,PLANS,THEME_SEARCHES,synergyFeatures,cohesionReport} from './synergy.mjs';
 import {averageSpellManaValue} from './presentation.mjs';
 
@@ -225,14 +226,13 @@ export class DeckDoctor {
   async loadList(text,commanderName='',progress=()=>{}){
     progress('Checking uploaded card names and Commander legality against Scryfall…');
     const parsed=parseDecklist(text,commanderName);
-    const leader=await this.source.named(parsed.commander);
+    const leader=await lookupNamedCard(parsed.commander,this.source);
     if(!leader||!leader.eligible||!leader.commander)
       throw new DeckInputError('Commander is unknown or illegal: '+parsed.commander);
-    const fetched=await this.source.collection(parsed.entries.map(c=>c.name));
-    const byName=new Map(fetched.map(c=>[norm(c),coerce(c)]));
+    const byName=await resolveCardNames(parsed.entries.map(c=>c.name),this.source);
     const cards=[];
     for(const entry of parsed.entries){
-      const found=byName.get(lower(entry.name));
+      const found=byName.get(cardNameKey(entry.name));
       if(!found)throw new DeckInputError('Cannot verify this card on Scryfall: '+entry.name);
       for(let i=0;i<entry.quantity;i++)cards.push(found);
     }
