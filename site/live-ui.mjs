@@ -49,7 +49,7 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
       const tile=node('div','duel-hand-card');
       tile.append(art(card,'duel-card'),node('div','duel-hand-label',desc(card)));
       if(state.phase==='main'||state.phase==='respond'){
-        const land=isLand(card),ok=state.phase==='main'&&land?you.landsPlayed<1:!land&&duel.canCast(0,card);
+        const land=isLand(card),ok=state.phase==='main'&&land?you.landsPlayed<1&&(!state.rulesLab||supportInfo(card).supported):!land&&duel.canCast(0,card);
         let select=null;
         const targets=state.rulesLab ? duel.availableTargets(card) : state.players[1].battlefield.filter(x=>!isLand(x.card));
         if(!land&&ok&&(state.rulesLab ? Boolean(supportInfo(card).target) : /destroy target|exile target|return target|damage to target/i.test(card.oracle_text||''))&&targets.length){
@@ -129,6 +129,14 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
       coverage.append(node('span','', 'Rules Lab · your cards supported: '+yours.percentage+'%'+(yours.commanderSupported?'':' · commander unsupported')),
         node('span','','AI cards supported: '+opponent.percentage+'%'));
       stage.append(coverage);
+      if(yours.percentage<85 || opponent.percentage<85 || !yours.commanderSupported || !opponent.commanderSupported) {
+        const warning=node('p','duel-unsupported-summary',
+          'Limited rules coverage: this matchup is NOT ready for representative testing. ' +
+          (!yours.commanderSupported?'Your commander cannot be cast. ':'')+
+          (!opponent.commanderSupported?'The AI commander cannot be cast. ':'')+
+          'Unsupported cards stay disabled; choose simpler decks or use quick-play until more effects are implemented.');
+        stage.append(warning);
+      }
       if(state.stack.length){
         const stack=node('div','duel-stack');stack.append(node('strong','','Stack (top resolves first)'));
         [...state.stack].reverse().forEach(spell=>stack.append(node('div','','#'+spell.id+' · '+spell.name+' ('+(spell.side?'AI':'You')+')')));
