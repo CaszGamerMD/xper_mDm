@@ -5,6 +5,15 @@
 The main app lives in [`site/`](site/). It generates up to four 100-card Magic: The Gathering Commander decks, using live card data from [Scryfall](https://scryfall.com/docs/api). Input selected colors, up to three creature types, up to five themes, a locked single commander, and/or five required cards. Add an optional plain-English description and a target average mana value. You can copy lists straight from the webpage without downloading anything.
 
 
+
+## Interactive AI opponent — live practice (v0.5)
+
+In the saved-deck / playtest area choose a generated or stored player deck, select an imported **saved opponent deck**, and click **Play live vs AI**. The practice table renders opening hands, a free opening mulligan, a visible hand, battlefields, life totals and action log. You decide which land to play, cast spells or your commander, choose attackers, and assign blockers when the bot attacks. The opponent chooses cards to play and makes simple attacking/blocking decisions. Repeat and restart games without downloading anything.
+
+**Not an official or complete MTG rules implementation.** This **rules-lite interactive sandbox** covers one land play per turn, automatic tapping of simplified mana sources, basic mana costs, commander tax, basic creature summoning sickness, straightforward attacks and blocking, 40 life, commander-damage victory, and heuristically interpreted common removal / draw / ramp effects. Many card texts are **not** fully executed; actual stack / priority, most triggers and replacement effects, full combat rules, counters, planeswalker loyalty, additional land drops, face-down cards, modal effects, variable mana, and true multiplayer Commander are not supported. This mode is suitable for hands-on goldfishing and rough pacing observations, **not** determining who would win an actual sanctioned or kitchen-table Commander game. Imported lists are checked for deck construction using Scryfall but not every bespoke deck-building exception is supported.
+
+The older **Run 20 simulated games** button remains available for fast statistical approximations. Neither mode uses a hosted language model or transmits user decks to a central app service; Scryfall requests are used for card verification.
+
 ## New: cohesive builds and browser-local 1v1 playtesting
 
 **Deck cohesion (v0.4):** Card selection now identifies a dominant archetype when possible and prioritizes role cards that actually enable or pay off that engine. The generator searches specifically for key enablers and payoffs, favors commander/tribal compatibility, and reports **engine cohesion**, **enabler count**, **payoff count**, and warnings if an engine is too thin. The mana-curve rebalancer avoids trading away major synergy pieces merely to hit the requested average. A high score is **not** a guaranteed strong deck: card interactions and combos are estimated heuristically.

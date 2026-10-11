@@ -2,6 +2,7 @@ import { generateDecks } from "./generator.mjs";
 import { sortedCardGroups } from "./presentation.mjs";
 import { interpretPrompt } from "./intent.mjs";
 import {DeckLibrary, importDecklist, simulateSeries} from "./playtest.mjs";
+import {mountLiveArena} from "./live-ui.mjs";
 const form = document.getElementById('builder');
 const output = document.getElementById('output');
 const submit = document.getElementById('submit');
@@ -277,3 +278,5 @@ document.getElementById('play-match').addEventListener('click',()=>{
     details.append(pre);section.append(details);
   }catch(error){section.append(elt('p','error',error.message||'Simulation could not run.'));}
 });
+
+mountLiveArena({mySelect,opponentSelect,resolveDeck});
