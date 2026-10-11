@@ -1,5 +1,7 @@
 /** Local-only human-vs-bot battlefield interface. */
 import {LiveDuel} from './live-match.mjs';
+import {RulesDuel} from './rules-duel.mjs';
+import {supportInfo} from './rules-kernel.mjs';
 const node=(tag,cls='',text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n;};
 const btn=(label,fn,secondary=false)=>{const b=node('button','action'+(secondary?' secondary':''),label);b.type='button';b.addEventListener('click',fn);return b;};
 const art=(card,cls)=>{
@@ -13,6 +15,7 @@ const isLand=c=>/\bLand\b/.test(String(c.type||'').split(' — ')[0]);
 export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   const stage=document.getElementById('live-game');
   const launch=document.getElementById('play-live');
+  const launchRules=document.getElementById('play-rules');
   let duel=null,chosen=new Set(),error='';
   const safe=fn=>()=>{try{fn();error='';render();}catch(e){error=e.message||'Action was not allowed.';render();}};
   function field(player,mine,phase) {
@@ -45,20 +48,22 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     you.hand.forEach((card,index)=>{
       const tile=node('div','duel-hand-card');
       tile.append(art(card,'duel-card'),node('div','duel-hand-label',desc(card)));
-      if(state.phase==='main'){
-        const land=isLand(card),ok=land?you.landsPlayed<1:duel.canCast(0,card);
+      if(state.phase==='main'||state.phase==='respond'){
+        const land=isLand(card),ok=state.phase==='main'&&land?you.landsPlayed<1&&(!state.rulesLab||supportInfo(card).supported):!land&&duel.canCast(0,card);
         let select=null;
-        const targets=state.players[1].battlefield.filter(x=>!isLand(x.card));
-        if(!land&&ok&&/destroy target|exile target|return target|damage to target/i.test(card.oracle_text||'')&&targets.length){
+        const targets=state.rulesLab ? duel.availableTargets(card) : state.players[1].battlefield.filter(x=>!isLand(x.card));
+        if(!land&&ok&&(state.rulesLab ? Boolean(supportInfo(card).target) : /destroy target|exile target|return target|damage to target/i.test(card.oracle_text||''))&&targets.length){
           select=node('select','duel-target');
-          targets.forEach(x=>{const opt=node('option','',x.card.name);opt.value=x.uid;select.append(opt);});
+          targets.forEach(x=>{const opt=node('option','',x.label||x.card?.name||'Opponent player');opt.value=x.uid;select.append(opt);});
           tile.append(select);
         }
         const action=btn(land?'Play land':'Cast spell',safe(()=>{
           if(land)duel.playLand(index);
           else duel.cast(index,select?Number(select.value):null);
         }));
-        action.disabled=!ok;tile.append(action);
+        action.disabled=!ok;
+        if(state.rulesLab && !land && !supportInfo(card).supported)tile.append(node('small','duel-unsupported','Not implemented: '+supportInfo(card).reason));
+        tile.append(action);
       }
       grid.append(tile);
     });
@@ -70,16 +75,19 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
       box.append(node('p','duel-instruction','Choose your opening hand. One free seven-card mulligan is available.'));
       box.append(btn('Keep hand',safe(()=>duel.keep())));
       const m=btn('Free mulligan',safe(()=>duel.mulligan()),true);m.disabled=!state.canMulligan;box.append(m);
-    }else if(state.phase==='main'){
-      box.append(node('p','duel-instruction','Your turn · play one land, cast spells, select ready attackers, then pass. Mana sources tap automatically.'));
+    }else if(state.phase==='main'||state.phase==='respond'){
+      const resolving=state.rulesLab&&state.stack.length>0;
+      box.append(node('p','duel-instruction',resolving?'Priority window: cast a supported instant in response or pass to resolve the top spell.':
+        'Your '+(state.rulesLab&&state.step==='postcombat'?'postcombat':'precombat')+' main phase · play one land, cast spells and select ready attackers.'));
       if(you.commanderInZone){
         const commander=btn('Cast commander (tax '+you.commanderTax+')',safe(()=>duel.castCommander()),true);
         commander.disabled=!you.canCastCommander;box.append(commander);
       }
-      if(!state.humanAttacked)box.append(btn('Attack with selected',safe(()=>{
+      if(state.phase==='main'&&!state.humanAttacked)box.append(btn('Attack with selected',safe(()=>{
         duel.beginCombat([...chosen]);chosen=new Set();
       })));
-      box.append(btn('End turn → AI plays',safe(()=>{chosen=new Set();duel.endTurn();}),true));
+      if(resolving)box.append(btn('Pass priority / Resolve stack',safe(()=>duel.passPriority()),true));
+      else box.append(btn('End turn → AI plays',safe(()=>{chosen=new Set();duel.endTurn();}),true));
     }else if(state.phase==='defend'){
       box.append(node('p','duel-instruction','AI attacks! Pick a unique untapped blocker for each attacker or leave it unblocked.'));
       const blockers=you.battlefield.filter(x=>/\bCreature\b/.test(String(x.card.type).split(' — ')[0])&&!x.tapped);
@@ -101,7 +109,7 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     }else if(state.phase==='finished'){
       box.append(node('h3','',state.winner===0?'You win!':'AI wins!'));
       box.append(btn('Restart duel',safe(()=>{
-        const decks=duel.originalDecks;duel=new LiveDuel(decks[0],decks[1],{seed:Date.now()});
+        const decks=duel.originalDecks;duel=new duel.constructor(decks[0],decks[1],{seed:Date.now()});
         duel.originalDecks=decks;chosen=new Set();
       })));
     }
@@ -113,8 +121,28 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     const state=duel.view();
     const heading=node('div','duel-heading');
     heading.append(node('h3','','Interactive duel · round '+state.round),
-      node('span','duel-phase',({opening:'Opening hand',main:'Your main phase',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
+      node('span','duel-phase',({opening:'Opening hand',main:'Your main phase',respond:'Respond / stack',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
     stage.append(heading);
+    if(state.rulesLab){
+      const coverage=node('div','duel-coverage');
+      const [yours,opponent]=state.coverage;
+      coverage.append(node('span','', 'Rules Lab · your cards supported: '+yours.percentage+'%'+(yours.commanderSupported?'':' · commander unsupported')),
+        node('span','','AI cards supported: '+opponent.percentage+'%'));
+      stage.append(coverage);
+      if(yours.percentage<85 || opponent.percentage<85 || !yours.commanderSupported || !opponent.commanderSupported) {
+        const warning=node('p','duel-unsupported-summary',
+          'Limited rules coverage: this matchup is NOT ready for representative testing. ' +
+          (!yours.commanderSupported?'Your commander cannot be cast. ':'')+
+          (!opponent.commanderSupported?'The AI commander cannot be cast. ':'')+
+          'Unsupported cards stay disabled; choose simpler decks or use quick-play until more effects are implemented.');
+        stage.append(warning);
+      }
+      if(state.stack.length){
+        const stack=node('div','duel-stack');stack.append(node('strong','','Stack (top resolves first)'));
+        [...state.stack].reverse().forEach(spell=>stack.append(node('div','','#'+spell.id+' · '+spell.name+' ('+(spell.side?'AI':'You')+')')));
+        stage.append(stack);
+      }
+    }
     if(error)stage.append(node('div','error',error));
     stage.append(field(state.players[1],false,state.phase));
     stage.append(toolbar(state));
@@ -125,12 +153,14 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     log.append(node('pre','',state.log.slice(-35).join('\n')));
     stage.append(log);
   }
-  launch.addEventListener('click',safe(()=>{
+  const start=(Ctor)=>safe(()=>{
     const mine=resolveDeck(mySelect.value),opponent=resolveDeck(opponentSelect.value);
     if(!mine||!opponent)throw new Error('Choose your deck and a saved opponent deck first.');
-    duel=new LiveDuel(mine,opponent,{seed:Date.now()});
+    duel=new Ctor(mine,opponent,{seed:Date.now()});
     duel.originalDecks=[mine,opponent];chosen=new Set();
     stage.scrollIntoView({behavior:'smooth',block:'start'});
-  }));
+  });
+  launch.addEventListener('click',start(LiveDuel));
+  if(launchRules)launchRules.addEventListener('click',start(RulesDuel));
   render();
 }

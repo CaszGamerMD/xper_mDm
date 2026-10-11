@@ -89,6 +89,7 @@
           <select id="play-opponent-deck"><option value="">Choose an opponent</option></select>
           <div class="play-actions">
             <button type="button" class="action" id="play-live">Play live vs AI</button>
+            <button type="button" class="action secondary" id="play-rules">Rules Lab · strict effects</button>
             <button type="button" class="action secondary" id="play-match">Run 20 simulated games</button>
             <button type="button" class="action secondary" id="play-delete">Delete selected opponent</button>
           </div>
@@ -106,6 +107,7 @@
           <p id="import-status" class="hint" aria-live="polite"></p>
         </form>
       </div>
+      <p class="hint"><strong>Rules Lab (experimental):</strong> a separate fail-closed mode with a visible spell stack, instant response windows, counterspells, simple targeted spells and simultaneous combat. Cards outside the explicitly supported subset cannot be cast. The displayed coverage percentage helps you judge whether a deck is ready for meaningful testing. This is a foundation, <strong>not yet full Magic rules support</strong>.</p>
       <div id="live-game" class="live-game" aria-live="polite"></div>
       <div id="play-results" class="play-results" aria-live="polite"></div>
       <p class="hint">Saved lists use <strong>localStorage</strong> instead of cookies (cookies are too small for complete decks). Nothing is uploaded to our server. Saved lists remain on this browser until you clear site data, browse privately, or delete them; they do not sync across devices. A maximum of 12 decks is retained.</p>
