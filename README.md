@@ -9,6 +9,17 @@ The main app lives in [`site/`](site/). It generates up to four 100-card Magic: 
 
 
 
+
+## Three pages, mana-base improvements and interactive zone previews (v0.9)
+
+The same browser-only site now has three independent pages accessed by the navigation tabs or URL fragments: **Deck Generator** (#generator), **Deck Doctor** (#doctor), **AI Playtest** (#playtest). Switching pages does not erase the builder, loaded lists or match state. The card-size preference remains available on the generator page and applies throughout the app.
+
+**Mana-aware Deck Doctor:** Ratings now compare colored mana symbols in the deck and commander against available colored mana sources from lands. Land counts are independently evaluated against an approximate 37-land reference. Optimizations may replace spells with lands, surplus lands with spells, or colorless/wrong-color lands with better fixing **when the same estimated construction rating improves**. Suggested one-for-one removals and replacements show card images and links; the report displays an estimated color-source breakdown. This is a heuristic that does not simulate all land search, mana abilities or a deck's actual draw probabilities. Preserve the user-selected cap on changes, commander rules and color legality.
+
+**AI Playtest deck and zone visibility:** Both selected deck previews show their commander and an expandable gallery of the full 99-card list. During a match each player has expandable **Graveyard**, **Exile** and **Command zone** areas; click a card to enlarge its art and Oracle text. Exile/return-to-hand spells in quick-play use corresponding zones rather than being recorded as destruction.
+
+**AI action review:** In quick-play, AI spells likely to change the human's creatures, other permanents or life **pause for explicit acknowledgement** before resolution. In experimental Rules Lab those spells and AI counterspells pause before entering the stack, and the player can respond with supported instants when the spell is placed on the stack. Combat already requires manual block assignment. This is a **confirmation to review an opponent's legal play, not permission to veto it**. It does not add full priority/timing or full Magic rules.
+
 ## Deck Doctor: rate and conservatively upgrade uploaded Commander decks (v0.8)
 
 In **Deck Doctor · Rate & improve your deck**, upload a plain-text decklist (TXT, DEK, DEC) or paste an exported list. Enter the commander by name or use a Commander section. The tool verifies the **99-card main deck + 1 single commander** against live Scryfall data, including Commander legality, color identity, land types and singleton requirements. It supports conventional numbered exports (for example, 1 Sol Ring or 1x Sol Ring) and basic land multiples; specialty deck exceptions may require more work.
