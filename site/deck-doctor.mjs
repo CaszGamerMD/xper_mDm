@@ -230,7 +230,7 @@ function checkDeck(cards,commander){
  * receive their own short candidate search instead of being crowded out by
  * hundreds of role-only suggestions. Hard limit evaluations per iteration.
  */
-export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,context=null,onProgress=null}={}){
+export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGain=.65,context=null,onProgress=null}={}){
   if(!Number.isInteger(maxSwaps)||maxSwaps<0||maxSwaps>20)
     throw new DeckInputError('Maximum suggested swaps must be between 0 and 20.');
   const leader=coerce(commander),original=cards.map(coerce);
@@ -356,12 +356,29 @@ export function improveCards(cards,commander,candidates,{maxSwaps=8,minGain=.65,
     state=best.next;
     if(typeof onProgress==='function')onProgress({done:swaps.length,max:maxSwaps,
       lands:state.lands,target:state.land_target});
+    yield {done:swaps.length,max:maxSwaps,lands:state.lands,target:state.land_target};
   }
   checkDeck(selected,leader);
   return {cards:selected,commander:leader,before:initial,after:state,swaps,
     context:ctx,remaining:99-swaps.length,evaluations:totalEvaluations};
 }
 
+export function improveCards(cards,commander,candidates,options={}){
+  const steps=improveCardsSteps(cards,commander,candidates,options);
+  let item=steps.next();
+  while(!item.done)item=steps.next();
+  return item.value;
+}
+async function improveCardsResponsive(cards,commander,candidates,options={}){
+  const steps=improveCardsSteps(cards,commander,candidates,options);
+  let item=steps.next();
+  while(!item.done){
+    // Let the browser paint progress and remain responsive even with 20 swaps.
+    await new Promise(resolve=>setTimeout(resolve,0));
+    item=steps.next();
+  }
+  return item.value;
+}
 function viewCard(c,quantity=1){
   return {name:c.name,quantity,cmc:c.cmc,type:c.type_line,oracle_text:c.oracle_text,
     mana_cost:c.mana_cost,color_identity:c.color_identity,keywords:c.keywords||[],
@@ -484,7 +501,11 @@ export class DeckDoctor {
     const original=rateDeck(loaded.cards,loaded.commander,context);
     progress('Evaluating structure, roles, cohesion, mana curve and minimal-change upgrades…');
     const pool=maxSwaps?await this.candidatePool(loaded.cards,loaded.commander,context,progress):[];
-    const tuned=improveCards(loaded.cards,loaded.commander,pool,{maxSwaps,context});
+    const tuned=await improveCardsResponsive(loaded.cards,loaded.commander,pool,{
+      maxSwaps,context,
+      onProgress:p=>progress('Checking verified swaps '+p.done+'/'+p.max+
+        ' · '+p.lands+' lands (target '+p.target+')…')
+    });
     let suggestion=null;
     if(considerCommander) {
       // The threshold is deliberately high: a commander change only qualifies
