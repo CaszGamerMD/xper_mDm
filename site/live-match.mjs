@@ -230,15 +230,20 @@ export class LiveDuel {
     if(/\b(destroy all creatures|exile all creatures|each creature gets -[0-9])\b/.test(effect)) {
       let hits=0;
       for(const player of this.players)for(const obj of [...player.battlefield])if(isCreature(obj.card)){
-        this._destroy(obj,player===p?side:1-side);hits++;
+        const owner=player===p?side:1-side;
+        if(effect.includes('exile all creatures'))this._moveObject(obj,owner,'exile');
+        else this._destroy(obj,owner);
+        hits++;
       }
       this._log(card.name+' clears '+hits+' simulated creatures.');
     } else if(/\b(destroy target|exile target|return target .+ to .+hand|deals? \d+ damage to target)\b/.test(effect)) {
       const choices=opponent.battlefield.filter(x=>!isLand(x.card));
       const selected=choices.find(x=>x.uid===target)||choices.sort((a,b)=>cardStrength(b.card)-cardStrength(a.card))[0];
       if(selected){
-        this._destroy(selected,1-side);
-        this._log(card.name+' removes '+selected.card.name+' (simplified targeting).');
+        const zone=/\bexile target\b/.test(effect)?'exile':/\breturn target\b/.test(effect)?'hand':'graveyard';
+        if(zone==='graveyard')this._destroy(selected,1-side);
+        else this._moveObject(selected,1-side,zone);
+        this._log(card.name+' moves '+selected.card.name+' to '+zone+' (simplified targeting).');
       } else this._log(card.name+' has no eligible simulated opposing permanent.');
     }
     const draws=/draw (two|three|four) cards/.exec(effect);
@@ -267,6 +272,15 @@ export class LiveDuel {
     if(isPermanent(card))this._addPermanent(side,card);
     else p.graveyard.push(card);
     if(commander)p.commanderInZone=false;
+  }
+  _moveObject(obj,side,zone){
+    const p=this.players[side],index=p.battlefield.findIndex(x=>x.uid===obj.uid);
+    if(index===-1)return;
+    p.battlefield.splice(index,1);
+    if(obj.commander){p.commanderInZone=true;this._log(obj.card.name+' returns to the command zone.');}
+    else if(zone==='hand')p.hand.push(obj.card);
+    else if(zone==='exile')p.exile.push(obj.card);
+    else p.graveyard.push(obj.card);
   }
   _destroy(obj,side){
     const p=this.players[side],index=p.battlefield.findIndex(x=>x.uid===obj.uid);
