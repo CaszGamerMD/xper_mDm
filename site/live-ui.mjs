@@ -16,6 +16,22 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   const stage=document.getElementById('live-game');
   const launch=document.getElementById('play-live');
   const launchRules=document.getElementById('play-rules');
+  const previews=document.getElementById('play-deck-previews');
+  const inspector=node('dialog','card-inspector');
+  const close=btn('Close card preview',()=>inspector.close(),true);
+  const inspection=node('div','card-inspector-content');
+  inspector.append(close,inspection);
+  document.body.append(inspector);
+  function inspectCard(card){
+    inspection.replaceChildren();
+    inspection.append(node('h3','',card.name));
+    if(card.image){
+      const image=node('img');image.src=card.image;image.alt=card.name;inspection.append(image);
+    }
+    if(card.type||card.type_line)inspection.append(node('p','',card.type||card.type_line));
+    if(card.oracle_text)inspection.append(node('p','card-oracle-text',card.oracle_text));
+    if(!inspector.open)inspector.showModal();
+  }
   const mulliganChoice=document.getElementById('mulligan-mode');
   const MULLIGAN_PREF='xper_mDm.mulligan_mode.v1';
   try {
@@ -26,6 +42,34 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     try {window.localStorage.setItem(MULLIGAN_PREF,mulliganChoice.value);} catch {}
   });
   let duel=null,chosen=new Set(),bottomCards=new Set(),error='';
+  function previewTile(card,label=''){
+    const tile=node('button','preview-tile');
+    tile.type='button';tile.title='Enlarge '+card.name;tile.setAttribute('aria-label','Preview '+card.name);
+    tile.append(art(card,'preview-card-art'),node('span','',label||card.name));
+    tile.addEventListener('click',()=>inspectCard(card));
+    return tile;
+  }
+  function renderDeckPreviews(){
+    if(!previews)return;
+    previews.replaceChildren();
+    for(const [key,select] of [['Your deck',mySelect],['AI opponent deck',opponentSelect]]){
+      const deck=resolveDeck(select.value);
+      const section=node('section','play-deck-overview');
+      section.append(node('h3','',key));
+      if(!deck){section.append(node('p','hint','Choose a deck to see its commander and card list.'));previews.append(section);continue;}
+      section.append(previewTile(deck.commander,'Commander · '+deck.commander.name));
+      const details=node('details','play-deck-cards');
+      const cards=(deck.groups||[]).flatMap(group=>group.cards||[]);
+      const cardCount=cards.reduce((sum,c)=>sum+Number(c.quantity||1),0);
+      details.append(node('summary','','Show '+cardCount+' main-deck cards'));
+      const grid=node('div','play-deck-grid');
+      for(const card of cards)grid.append(previewTile(card,(card.quantity||1)+'× '+card.name));
+      details.append(grid);section.append(details);previews.append(section);
+    }
+  }
+  mySelect.addEventListener('change',renderDeckPreviews);
+  opponentSelect.addEventListener('change',renderDeckPreviews);
+  document.addEventListener('deck-vault-updated',renderDeckPreviews);
   const safe=fn=>()=>{try{fn();error='';render();}catch(e){error=e.message||'Action was not allowed.';render();}};
   function field(player,mine,phase) {
     const box=node('section','duel-field');
@@ -49,6 +93,22 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
       board.append(tile);
     }
     box.append(board);return box;
+  }
+  function zoneView(player,who){
+    const bar=node('div','duel-zones');
+    for(const [title,cards] of [
+      ['Graveyard',player.graveyardCards||[]],
+      ['Exile',player.exileCards||[]],
+      ['Command zone',player.commandZoneCards||[]]
+    ]){
+      const details=node('details','duel-zone');
+      details.append(node('summary','',who+' '+title+' · '+cards.length));
+      const grid=node('div','duel-zone-grid');
+      if(!cards.length)grid.append(node('p','hint','Empty'));
+      for(const card of cards)grid.append(previewTile(card));
+      details.append(grid);bar.append(details);
+    }
+    return bar;
   }
   function handView(state) {
     const you=state.players[0],box=node('section','duel-hand');
@@ -120,6 +180,13 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
       })));
       if(resolving)box.append(btn('Pass priority / Resolve stack',safe(()=>duel.passPriority()),true));
       else box.append(btn('End turn → AI plays',safe(()=>{chosen=new Set();duel.endTurn();}),true));
+    }else if(state.phase==='confirm-ai'){
+      const move=state.pendingAi;
+      box.append(node('p','duel-instruction',
+        move?.description||'An AI action may affect your cards or life. Review it before continuing.'));
+      if(move?.card)box.append(previewTile(move.card,'AI proposes '+move.card.name));
+      box.append(btn('Acknowledge AI action & continue',safe(()=>duel.confirmAiAction())));
+      box.append(node('p','hint','Acknowledgment does not veto a legal AI play. In Rules Lab you can respond after the spell goes on the stack.'));
     }else if(state.phase==='defend'){
       box.append(node('p','duel-instruction','AI attacks! Pick a unique untapped blocker for each attacker or leave it unblocked.'));
       const blockers=you.battlefield.filter(x=>/\bCreature\b/.test(String(x.card.type).split(' — ')[0])&&!x.tapped);
@@ -154,7 +221,7 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     const state=duel.view();
     const heading=node('div','duel-heading');
     heading.append(node('h3','','Interactive duel · round '+state.round),
-      node('span','duel-phase',({opening:'Opening hand',bottom:'Strict · select bottom cards',main:'Your main phase',respond:'Respond / stack',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
+      node('span','duel-phase',({opening:'Opening hand',bottom:'Strict · select bottom cards',main:'Your main phase',respond:'Respond / stack', 'confirm-ai':'Review AI action',defend:'Declare blockers',finished:'Finished'})[state.phase]||state.phase));
     stage.append(heading);
     if(state.rulesLab){
       const coverage=node('div','duel-coverage');
@@ -178,8 +245,10 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
     }
     if(error)stage.append(node('div','error',error));
     stage.append(field(state.players[1],false,state.phase));
+    stage.append(zoneView(state.players[1],'AI'));
     stage.append(toolbar(state));
     stage.append(field(state.players[0],true,state.phase));
+    stage.append(zoneView(state.players[0],'Your'));
     stage.append(handView(state));
     const log=node('details','duel-log');log.open=true;
     log.append(node('summary','','Actions · most recent 35'));
@@ -195,5 +264,6 @@ export function mountLiveArena({mySelect,opponentSelect,resolveDeck}) {
   });
   launch.addEventListener('click',start(LiveDuel));
   if(launchRules)launchRules.addEventListener('click',start(RulesDuel));
+  renderDeckPreviews();
   render();
 }
