@@ -11,9 +11,17 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">✦</span><span>xper<span class="mint">_mDm</span></span></div>
-    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.8 · DECK DOCTOR</span></div>
+    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.9 · MANA + PLAYTEST</span></div>
   </header>
+  <nav class="site-nav" aria-label="Main pages">
+    <div class="site-nav-tabs">
+      <button type="button" data-page="generator" aria-current="page"><span>01</span> Deck Generator</button>
+      <button type="button" data-page="doctor"><span>02</span> Deck Doctor</button>
+      <button type="button" data-page="playtest"><span>03</span> AI Playtest</button>
+    </div>
+  </nav>
   <main class="layout">
+    <div class="app-page" id="page-generator">
     <section class="intro">
       <div class="eyebrow">BUILD WITH INTENTION</div>
       <h1>Find your next <em>Commander</em> deck.</h1>
@@ -84,9 +92,10 @@
         </div>
       </section>
     </div>
-    <section class="play-panel" id="deck-doctor" aria-label="Deck Doctor"></section>
-    <section class="play-panel" id="playtest" aria-labelledby="playtest-title">
-      <div class="panelheading"><span>04</span><h2 id="playtest-title">Local deck vault &amp; AI playtest</h2></div>
+    </div>
+    <section class="play-panel app-page" id="deck-doctor" aria-label="Deck Doctor" hidden></section>
+    <section class="play-panel app-page" id="playtest" aria-labelledby="playtest-title" hidden>
+      <div class="panelheading"><span>03</span><h2 id="playtest-title">Local deck vault &amp; AI playtest</h2></div>
       <p class="play-explain">Save decks on this device, import another 100-card Commander list, and run a simulated 1v1 against a heuristic opponent pilot. Live mode lets you choose lands, cast spells, select attackers and blockers. It is a <strong>simplified practice game, not a fully rules-accurate Magic game</strong>: complex abilities, timing, targeting, colored mana, and combat rules are simplified. Results are directional, not real win rates.</p>
       <div class="play-grid">
         <div class="play-box">
@@ -121,6 +130,7 @@
           <p id="import-status" class="hint" aria-live="polite"></p>
         </form>
       </div>
+      <div id="play-deck-previews" class="play-deck-previews" aria-live="polite"></div>
       <p class="hint"><strong>Rules Lab (experimental):</strong> a separate fail-closed mode with a visible spell stack, instant response windows, counterspells, simple targeted spells and simultaneous combat. Cards outside the explicitly supported subset cannot be cast. The displayed coverage percentage helps you judge whether a deck is ready for meaningful testing. This is a foundation, <strong>not yet full Magic rules support</strong>.</p>
       <div id="live-game" class="live-game" aria-live="polite"></div>
       <div id="play-results" class="play-results" aria-live="polite"></div>
