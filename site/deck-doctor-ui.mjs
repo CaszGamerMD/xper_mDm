@@ -1,5 +1,5 @@
 /** In-browser upload + before/after ratings. User uploads stay in this browser. */
-import {DeckDoctor,deckView} from './deck-doctor.mjs';
+import {DeckDoctor} from './deck-doctor.mjs';
 const elem=(tag,cls='',value)=>{
   const e=document.createElement(tag);
   if(cls)e.className=cls;
@@ -163,14 +163,6 @@ export function mountDeckDoctor({saveDeck,openDeck}){
         {commander:commander.value.trim(),maxSwaps:Number(max.value),considerCommander:allow.checked},
         text=>{if(serial===currentRun)progress.textContent=text;});
       if(serial!==currentRun)return;
-      if(analyzed.commanderSuggestion) {
-        analyzed.commanderOnlyDeck=deckView(
-          // The original deck is already a complete and verified 99-card list.
-          analyzed.originalDeck.groups.flatMap(g=>g.cards.flatMap(card=>Array.from({length:card.quantity},()=>card))),
-          analyzed.commanderSuggestion.commander,
-          analyzed.commanderSuggestion.score,
-          'Deck Doctor · Commander-only alternative');
-      }
       render(analyzed);
       progress.textContent='Analysis complete. Review the swaps and save only what you want.';
     }catch(error){
