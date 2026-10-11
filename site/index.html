@@ -11,13 +11,18 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">✦</span><span>xper<span class="mint">_mDm</span></span></div>
-    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.4 · SYNERGY + PLAYTEST</span></div>
+    <div class="toplabel">COMMANDER DECK FORGE <span class="version">/ 0.7 · DECK BUILDER & MULLIGANS</span></div>
   </header>
   <main class="layout">
     <section class="intro">
       <div class="eyebrow">BUILD WITH INTENTION</div>
       <h1>Find your next <em>Commander</em> deck.</h1>
       <p>Choose a color identity, favorite creature types, mechanics, a commander, or up to five must-have cards. Describe your ideal playstyle, choose cards and colors, and generate up to four legality-checked 100-card decks right in your browser. Preview real card art and shape the mana curve.</p>
+      <div class="preview-size-controls">
+        <label for="card-scale">Card preview size <small>Changes gallery and AI-playthrough cards</small></label>
+        <input type="range" id="card-scale" min="0.9" max="1.8" value="1" step="0.1" aria-label="Card preview size multiplier">
+        <output id="card-scale-value" for="card-scale">100%</output>
+      </div>
     </section>
     <div class="workbench">
       <form id="builder" class="settings">
@@ -66,6 +71,8 @@
           <select id="options"><option value="4">4 deck ideas</option><option value="3">3 deck ideas</option><option value="2">2 deck ideas</option><option value="1">1 deck idea</option></select>
         </div>
         <button id="submit" class="generate" type="submit"><span>✦</span><span id="submit-text">Forge decks</span><span class="arrow">↗</span></button>
+        <button id="clear-builder" type="button" class="action secondary clear-builder">↺ Start over · clear builder</button>
+        <p class="hint">Start over clears builder selections and generated results, but keeps your saved decks.</p>
         <p class="legal-note">Legality: current Scryfall Commander data. Ratings estimate deck structure and theme fit, not actual win rate.</p>
       </form>
       <section class="results" id="results" aria-live="polite">
@@ -87,6 +94,12 @@
           <select id="play-your-deck"><option value="">Generate or save a deck first</option></select>
           <label for="play-opponent-deck">Opponent deck <small>Choose a stored decklist</small></label>
           <select id="play-opponent-deck"><option value="">Choose an opponent</option></select>
+          <label for="mulligan-mode">Opening hand mulligans <small>Applies to Live AI and Rules Lab</small></label>
+          <select id="mulligan-mode">
+            <option value="friendly">Friendly · unlimited free reshuffles</option>
+            <option value="strict">Strict · after X mulligans, bottom X − 1 cards</option>
+          </select>
+          <p class="hint">Friendly: mulligan as often as you like, then keep seven. Strict: you may mulligan repeatedly, and after keeping, select exactly X − 1 cards from your seven to put on the bottom of your library. The first Strict mulligan is free. The AI also chooses its opening hand using the selected mode.</p>
           <div class="play-actions">
             <button type="button" class="action" id="play-live">Play live vs AI</button>
             <button type="button" class="action secondary" id="play-rules">Rules Lab · strict effects</button>
