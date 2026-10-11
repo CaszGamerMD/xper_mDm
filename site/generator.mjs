@@ -4,6 +4,7 @@
  */
 import { BASICS, ROLE_SEEDS, ROLE_QUERIES, THEMES } from './seeds.mjs';
 import { interpretPrompt } from './intent.mjs';
+import {lookupNamedCard} from './card-lookup.mjs';
 import { averageSpellManaValue } from './presentation.mjs';
 import { deckPlan, synergyFeatures, cohesionReport, THEME_SEARCHES } from './synergy.mjs';
 
@@ -243,7 +244,7 @@ export class BrowserGenerator {
   async getFavorites(req) {
     const found=[];
     for (const name of req.favorites) {
-      const card=await this.source.named(name);
+      const card=await lookupNamedCard(name,this.source);
       if(!card) throw new DeckInputError('Could not find favorite card: '+name+'.');
       if(!card.eligible) throw new DeckInputError(card.name+' is not legal in paper Commander.');
       if(!found.some(c=>normalized(c)===normalized(card))) found.push(card);
@@ -253,7 +254,7 @@ export class BrowserGenerator {
   async commanders(req,favorites) {
     const needed = new Set(favorites.flatMap(card=>card.color_identity));
     if(req.commander) {
-      const card=await this.source.named(req.commander);
+      const card=await lookupNamedCard(req.commander,this.source);
       if(!card) throw new DeckInputError('Could not find commander: '+req.commander+'.');
       if(!card.eligible || !card.commander) throw new DeckInputError(card.name+' is not a legal single-card Commander commander.');
       if(req.colors.length && identity(card.color_identity)!==identity(req.colors))
