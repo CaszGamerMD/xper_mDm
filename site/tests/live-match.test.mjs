@@ -19,13 +19,15 @@ test('mana sources respect colors and untapped generic costs',()=>{
   assert.deepEqual(manaSource(card('Sol Ring','Artifact',1,'{1}','{T}: Add {C}{C}.'),['G']),
     {colors:['C'],amount:2});
 });
-test('mulligan, keep and land per turn have enforced phase restrictions',()=>{
-  const game=new LiveDuel(deck(),deck('Bot King',botFrog),{seed:3});
+test('friendly mulligans repeat without bottoming; land-per-turn rules still apply',()=>{
+  const game=new LiveDuel(deck(),deck('Bot King',botFrog),{seed:3,mulliganMode:'friendly'});
   assert.equal(game.view().phase,'opening');
-  game.mulligan();assert.equal(game.view().canMulligan,false);
-  assert.throws(()=>game.mulligan(),/one free mulligan/i);
+  for(let i=0;i<5;i++)game.mulligan();
+  assert.equal(game.view().mulligans,5);
+  assert.equal(game.view().canMulligan,true);
   game.keep();
   assert.equal(game.view().phase,'main');
+  assert.equal(game.players[0].hand.length,7);
   let index=game.players[0].hand.findIndex(c=>c.name==='Forest');
   assert.ok(index>=0);
   game.playLand(index);
