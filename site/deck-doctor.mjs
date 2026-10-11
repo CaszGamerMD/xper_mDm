@@ -271,8 +271,13 @@ export function* improveCardsSteps(cards,commander,candidates,{maxSwaps=8,minGai
     const positions=selected.map((c,i)=>{
       const r=roleFor(c,ctx),f=factsFor(c,leader,ctx);
       const surplus=r!=='land'&&r!=='synergy'?Math.max(0,state.roles[r]-(NEED[r]||0)):0;
+      const availableColors=isLand(c)?state.mana_balance.colors.filter(color=>
+        (c.produced_mana||[]).includes(color) ||
+        new RegExp('\\b'+({W:'Plains',U:'Island',B:'Swamp',R:'Mountain',G:'Forest'}[color])+'\\b').test(c.type_line||'') ||
+        /add (?:one|two|three) mana of any (?:one )?color/i.test(c.oracle_text||'')
+      ).length:0;
       return {c,i,weakness:isLand(c)?
-        (excess?120:needsColor?28:-200):
+        (excess?120:needsColor?40-12*availableColors:-200):
         (shortage?50:0)+surplus*5-structural(c)*.85+
         Math.max(0,c.cmc-5)*.6+(r==='synergy'?7:0),
         protectedEngine:f.enabler||f.payoff};
